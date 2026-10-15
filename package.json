@@ -1,0 +1,87 @@
+{
+  "name": "@fungi.computer/knapsack",
+  "version": "0.0.1",
+  "author": "Levi <levi@technomancy.dev>",
+  "description": "Agent tool connections projected into Mycelium capability sources",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./files-patch": {
+      "types": "./dist/files-patch.d.ts",
+      "import": "./dist/files-patch.js"
+    },
+    "./files-read": {
+      "types": "./dist/files-read.d.ts",
+      "import": "./dist/files-read.js"
+    },
+    "./patch": {
+      "types": "./dist/patch.d.ts",
+      "import": "./dist/patch.js"
+    },
+    "./files-read-codec": {
+      "types": "./dist/files-read-codec.d.ts",
+      "import": "./dist/files-read-codec.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs/api",
+    "README.md",
+    "LICENSE",
+    "LICENSE.codex"
+  ],
+  "scripts": {
+    "lint": "eslint src test --max-warnings=0 && ../../node_modules/.bin/oxlint --config ../../oxlint.config.ts --deny-warnings src test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
+    "clean": "node --input-type=module --eval \"import { rm } from 'node:fs/promises'; await rm('dist', { recursive: true, force: true });\"",
+    "test": "vitest run",
+    "docs": "tsx ../../tooling/repository/src/docs/cli.ts check --root ../..",
+    "docs:write": "tsx ../../tooling/repository/src/docs/cli.ts write --root ../..",
+    "stranger": "tsx ../../tooling/repository/src/artifacts/cli.ts --repo-root ../.. .",
+    "pack": "mkdir -p ../../.botanical/knapsack-pack && pnpm pack --pack-destination ../../.botanical/knapsack-pack",
+    "smoke": "node --input-type=module -e \"import('./dist/index.js').then(({ Knapsack }) => { if (!Knapsack) process.exit(1); })\"",
+    "format:check": "node ../../tooling/repository/scripts/format-package-check.mjs",
+    "lint:anti-slop": "node ../../tooling/repository/scripts/lint-package-anti-slop.mjs"
+  },
+  "dependencies": {
+    "@fungi.computer/cairn": "workspace:*",
+    "@fungi.computer/forage": "workspace:*",
+    "@fungi.computer/mule": "workspace:*",
+    "@fungi.computer/mycelium": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0",
+    "diff": "8.0.4",
+    "effect": "4.0.2",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "botanical": {
+    "role": "package",
+    "operations": {
+      "lint": "required",
+      "typecheck": "required",
+      "build": "required",
+      "test": "required",
+      "docs": "required",
+      "pack": "required",
+      "smoke": "required",
+      "stranger": "required"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fungi-computer/knapsack.git"
+  }
+}

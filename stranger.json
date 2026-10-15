@@ -1,0 +1,98 @@
+{
+  "expectedTarballFiles": [
+    "package/LICENSE",
+    "package/LICENSE.codex",
+    "package/README.md",
+    "package/dist/files-patch.d.ts",
+    "package/dist/files-patch.js",
+    "package/dist/files-read-codec.d.ts",
+    "package/dist/files-read-codec.js",
+    "package/dist/files-read.d.ts",
+    "package/dist/files-read.js",
+    "package/dist/files.d.ts",
+    "package/dist/files.js",
+    "package/dist/index.d.ts",
+    "package/dist/index.js",
+    "package/dist/patch-grammar.d.ts",
+    "package/dist/patch-grammar.js",
+    "package/dist/patch.d.ts",
+    "package/dist/patch.js",
+    "package/docs/api/README.md",
+    "package/docs/api/files-patch.md",
+    "package/docs/api/files-read-codec.md",
+    "package/docs/api/files-read.md",
+    "package/docs/api/index.md",
+    "package/docs/api/patch.md",
+    "package/package.json"
+  ],
+  "localDependencies": ["../cairn", "../mule", "../mycelium"],
+  "consumerDevDependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0"
+  },
+  "runtimeFixture": "test/stranger/runtime.mjs",
+  "typecheckFixture": "test/stranger/consumer.mts",
+  "docs": {
+    "sigil": "installApps",
+    "home": {
+      "lead": "Validated file reads, edits and patches for an Agent's Computer, for TypeScript services that host their own Agent runtime.",
+      "example": {
+        "file": "home.ts",
+        "title": "Validate a Files read request",
+        "caption": "Validates a bounded Files read request with the same Zod schema the Files module uses, then rejects one whose page limit is too small."
+      },
+      "ladder": {
+        "start": [
+          {
+            "title": "Quickstart",
+            "href": "/quickstart/",
+            "description": "Validate a Files read request with the package's own decoder."
+          },
+          {
+            "title": "Core concepts",
+            "href": "/concepts/#core-concepts",
+            "description": "Computers, Files ports and what Knapsack does not own or admit."
+          }
+        ],
+        "tasks": [
+          {
+            "title": "Validate a Files read request",
+            "href": "/api/files-read/",
+            "description": "readInputSchema, readOutputSchema and the shared path and text bounds."
+          },
+          {
+            "title": "Present or apply a patch",
+            "href": "/api/files-patch/",
+            "description": "Patch input and output codecs without loading the tool runtime."
+          },
+          {
+            "title": "Decode a framed read request",
+            "href": "/api/files-read-codec/",
+            "description": "Encode read requests and adapt a framed transport to the Files port."
+          },
+          {
+            "title": "Connect one Computer's tools",
+            "href": "/api/entry/",
+            "description": "Knapsack.computer, Knapsack.computers and Knapsack.files, from the root export."
+          }
+        ],
+        "reference": [
+          {
+            "title": "API reference",
+            "href": "/api/",
+            "description": "Every export from the root, ./files-patch, ./files-read, ./patch and ./files-read-codec entrypoints."
+          },
+          {
+            "title": "Install",
+            "href": "/install/",
+            "description": "Entrypoints, runtime dependencies and Node.js version."
+          },
+          {
+            "title": "Status and limits",
+            "href": "/status/",
+            "description": "Stability, errors and license."
+          }
+        ]
+      }
+    }
+  }
+}
