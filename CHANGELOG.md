@@ -1,5 +1,18 @@
 # @fungi.computer/knapsack
 
+## 0.0.2
+
+### Patch Changes
+
+- Changes since 0.0.1:
+
+  - perf(oyster): defer heavy SDKs out of Worker startup
+
+- Updated dependencies
+  - @fungi.computer/mule@0.0.2
+  - @fungi.computer/mycelium@0.0.2
+  - @fungi.computer/forage@0.0.2
+
 ## 0.0.1
 
 ### Patch Changes

@@ -156,9 +156,6 @@ export const editOutputSchema = z.union([
   filesEditFailureSchema,
 ]);
 
-/** Model-facing parameters derived from the one Zod decoder `prepare` uses. */
-const patchParameters = z.toJSONSchema(patchInputSchema);
-
 /** Host-owned native patch operation receiving the invocation's deadline and signal. */
 export type FilesPatch = (
   input: z.output<typeof patchInputSchema>,
@@ -584,7 +581,8 @@ function patchTool(invokePatch: FilesPatch): FileTool {
       name: "apply_patch",
       description:
         "Apply a Codex patch to the selected Files root. Example:\n*** Begin Patch\n*** Update File: path/to/file\n@@\n context line\n-old line\n+new line\n*** End Patch\nUse @@ alone or followed by an existing context line; unified-diff @@ line numbers are not supported. Add/Delete File and optional Move to are also supported. Paths stay inside the root; symlinks and parent traversal are rejected. A failure returns recovery guidance and may follow earlier file writes; inspect the result before retrying. Prefer this to shell or Python replacement.",
-      parameters: patchParameters,
+      // Model-facing parameters derived from the one Zod decoder `prepare` uses.
+      parameters: z.toJSONSchema(patchInputSchema),
       constrainedSampling: {
         type: "grammar",
         variants: { openai_lark: patchGrammar },
