@@ -60,96 +60,114 @@ export const listInputSchema = z.strictObject({
     .max(maximumResultEntries)
     .default(maximumResultEntries),
 });
-const listEntrySchema = z.strictObject({
-  path: pathSchema,
-  name: z.string().min(1),
-  type: z.enum(["file", "directory", "symlink"]),
-  size: z.number().int().nonnegative(),
-  modifiedAt: z.number(),
-});
-/** Directory entries and an explicit truncation flag. */
-export const listOutputSchema = z.strictObject({
-  path: pathSchema,
-  entries: z.array(listEntrySchema).max(maximumResultEntries),
-  truncated: z.boolean(),
-});
-/** Bounded path-pattern search request. */
-export const globInputSchema = z.strictObject({
-  path: pathSchema,
-  pattern: z.string().min(1).max(maximumPatternCharacters),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(maximumResultEntries)
-    .default(maximumResultEntries),
-});
-/** Matching paths and an explicit truncation flag. */
-export const globOutputSchema = z.strictObject({
-  path: pathSchema,
-  matches: z.array(pathSchema).max(maximumResultEntries),
-  truncated: z.boolean(),
-});
-/** Bounded content-search request with optional regular-expression matching. */
-export const grepInputSchema = z.strictObject({
-  path: pathSchema,
-  pattern: z.string().min(1).max(maximumPatternCharacters),
-  regex: z.boolean().default(false),
-  ignoreCase: z.boolean().default(false),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(maximumResultEntries)
-    .default(maximumResultEntries),
-});
-/** Content matches and an explicit truncation flag. */
-export const grepOutputSchema = z.strictObject({
-  path: pathSchema,
-  matches: z
-    .array(
-      z.strictObject({
-        path: pathSchema,
-        line: z.number().int().positive(),
-        text: z.string(),
-      }),
-    )
-    .max(maximumResultEntries),
-  truncated: z.boolean(),
-});
-/** Text replacement request decoded before the captured Files port is called. */
-export const editInputSchema = z.strictObject({
-  path: pathSchema,
-  oldText: boundedTextSchema(1),
-  newText: boundedTextSchema(),
-});
-const editSuccessSchema = z.strictObject({
-  path: pathSchema,
-  bytes: z.number().int().nonnegative(),
-  diff: z.string(),
-  firstChangedLine: z.number().int().positive().nullable(),
-  unifiedPatch: z.string().nullable(),
-  unifiedPatchBytes: z.number().int().nonnegative(),
-  unifiedPatchAddedLines: z.number().int().nonnegative(),
-  unifiedPatchRemovedLines: z.number().int().nonnegative(),
-  unifiedPatchTruncated: z.boolean(),
-});
-/** Structured edit refusal, including its reason and affected path. */
-export const filesEditFailureSchema = z.strictObject({
-  status: z.literal("failed"),
-  error: z.strictObject({
-    kind: z.enum([
-      "not-found",
-      "ambiguous",
-      "file-too-large",
-      "partial-character",
-      "unchanged",
-      "conflict",
-    ]),
+const listEntrySchema = z.lazy(() =>
+  z.strictObject({
     path: pathSchema,
-    message: z.string(),
+    name: z.string().min(1),
+    type: z.enum(["file", "directory", "symlink"]),
+    size: z.number().int().nonnegative(),
+    modifiedAt: z.number(),
   }),
-});
+);
+/** Directory entries and an explicit truncation flag. */
+export const listOutputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    entries: z.array(listEntrySchema).max(maximumResultEntries),
+    truncated: z.boolean(),
+  }),
+);
+/** Bounded path-pattern search request. */
+export const globInputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    pattern: z.string().min(1).max(maximumPatternCharacters),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(maximumResultEntries)
+      .default(maximumResultEntries),
+  }),
+);
+/** Matching paths and an explicit truncation flag. */
+export const globOutputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    matches: z.array(pathSchema).max(maximumResultEntries),
+    truncated: z.boolean(),
+  }),
+);
+/** Bounded content-search request with optional regular-expression matching. */
+export const grepInputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    pattern: z.string().min(1).max(maximumPatternCharacters),
+    regex: z.boolean().default(false),
+    ignoreCase: z.boolean().default(false),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(maximumResultEntries)
+      .default(maximumResultEntries),
+  }),
+);
+/** Content matches and an explicit truncation flag. */
+export const grepOutputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    matches: z
+      .array(
+        z.strictObject({
+          path: pathSchema,
+          line: z.number().int().positive(),
+          text: z.string(),
+        }),
+      )
+      .max(maximumResultEntries),
+    truncated: z.boolean(),
+  }),
+);
+/** Text replacement request decoded before the captured Files port is called. */
+export const editInputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    oldText: boundedTextSchema(1),
+    newText: boundedTextSchema(),
+  }),
+);
+const editSuccessSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    bytes: z.number().int().nonnegative(),
+    diff: z.string(),
+    firstChangedLine: z.number().int().positive().nullable(),
+    unifiedPatch: z.string().nullable(),
+    unifiedPatchBytes: z.number().int().nonnegative(),
+    unifiedPatchAddedLines: z.number().int().nonnegative(),
+    unifiedPatchRemovedLines: z.number().int().nonnegative(),
+    unifiedPatchTruncated: z.boolean(),
+  }),
+);
+/** Structured edit refusal, including its reason and affected path. */
+export const filesEditFailureSchema = z.lazy(() =>
+  z.strictObject({
+    status: z.literal("failed"),
+    error: z.strictObject({
+      kind: z.enum([
+        "not-found",
+        "ambiguous",
+        "file-too-large",
+        "partial-character",
+        "unchanged",
+        "conflict",
+      ]),
+      path: pathSchema,
+      message: z.string(),
+    }),
+  }),
+);
 /** Successful edit metadata or a typed edit refusal. */
 export const editOutputSchema = z.union([
   editSuccessSchema,

@@ -18,23 +18,31 @@ const describeConcurrency = 8;
 const defaultDescribeTimeoutMillis = 10_000;
 const utf8 = new TextEncoder();
 const jsonValueSchema = z.json();
-const jsonSchemaDocument = z.custom<Parameters<typeof z.fromJSONSchema>[0]>(
-  (value) => jsonValueSchema.safeParse(value).success,
+const jsonSchemaDocument = z.lazy(() =>
+  z.custom<Parameters<typeof z.fromJSONSchema>[0]>(
+    (value) => jsonValueSchema.safeParse(value).success,
+  ),
 );
-const capabilityNameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[A-Za-z][A-Za-z0-9_]*$/);
-const capabilitySchema = z.strictObject({
-  id: capabilityNameSchema,
-  name: capabilityNameSchema,
-  kind: z.string().min(1).max(128),
-  description: z.string().min(1).max(2_048),
-  parameters: jsonSchemaDocument,
-  output: jsonSchemaDocument.optional(),
-});
-const capabilitiesSchema = z.array(capabilitySchema).max(maximumCapabilities);
+const capabilityNameSchema = z.lazy(() =>
+  z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z][A-Za-z0-9_]*$/),
+);
+const capabilitySchema = z.lazy(() =>
+  z.strictObject({
+    id: capabilityNameSchema,
+    name: capabilityNameSchema,
+    kind: z.string().min(1).max(128),
+    description: z.string().min(1).max(2_048),
+    parameters: jsonSchemaDocument,
+    output: jsonSchemaDocument.optional(),
+  }),
+);
+const capabilitiesSchema = z.lazy(() =>
+  z.array(capabilitySchema).max(maximumCapabilities),
+);
 
 type JsonSchemaDocument = Parameters<typeof z.fromJSONSchema>[0];
 
