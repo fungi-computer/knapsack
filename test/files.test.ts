@@ -11,8 +11,13 @@ import {
   type InvocationContext,
   type MyceliumJsonValue,
 } from "@fungi.computer/mycelium";
-import { readOutputSchema } from "../src/files-read.js";
-import { Knapsack, type FilesPort } from "../src/index.js";
+import { readOutputSchema, sniffImageMimeType } from "../src/files-read.js";
+import {
+  Knapsack,
+  type FilesPort,
+  type FileTool,
+  type FileToolName,
+} from "../src/index.js";
 
 type FilesOperation = "read" | "list" | "glob" | "grep" | "edit" | "patch";
 type MemoryPort = Readonly<{ port: FilesPort; get: () => string }>;
@@ -48,11 +53,11 @@ function memoryPort(initial: string): MemoryPort {
         });
       },
       list: (input) =>
-        Promise.resolve({ path: input.path, entries: [], truncated: false }),
+        Promise.resolve({ path: input.path, results: [], truncated: null }),
       glob: (input) =>
-        Promise.resolve({ path: input.path, matches: [], truncated: false }),
+        Promise.resolve({ path: input.path, results: [], truncated: null }),
       grep: (input) =>
-        Promise.resolve({ path: input.path, matches: [], truncated: false }),
+        Promise.resolve({ path: input.path, results: [], truncated: null }),
       replace: (input) => {
         if (content !== input.expectedContent)
           return Promise.reject(
@@ -74,6 +79,23 @@ async function executeInner(
   operation: FilesOperation,
   argumentsValue: MyceliumJsonValue,
 ): Promise<ExecuteResult> {
+  const { content, isError } = await executeAll(
+    port,
+    operation,
+    argumentsValue,
+  );
+  const [text] = content;
+  if (text?.type !== "text")
+    throw new Error("Files test expected text content");
+  return { content: [{ type: "text", text: text.text }], isError };
+}
+
+/** Every content part of the execute result, images included. */
+async function executeAll(
+  port: FilesPort,
+  operation: FilesOperation,
+  argumentsValue: MyceliumJsonValue,
+) {
   let sandboxFailure: Error | undefined;
   const surface = Knapsack.files({ port });
   const runtime = await Mycelium.make({
@@ -102,7 +124,7 @@ async function executeInner(
       arguments: { code: operation },
     }),
   );
-  let output: ExecuteResult;
+  let output;
   try {
     const parts = await Effect.runPromise(
       Stream.runCollect(prepared.execute()),
@@ -110,13 +132,7 @@ async function executeInner(
     const [part] = parts;
     if (part?.type !== "result")
       throw new Error("Files test expected a terminal result");
-    const [text] = part.result.content;
-    if (text?.type !== "text")
-      throw new Error("Files test expected text content");
-    output = {
-      content: [{ type: "text", text: text.text }],
-      isError: part.result.isError,
-    };
+    output = { content: part.result.content, isError: part.result.isError };
   } catch (cause) {
     await lease.release();
     await runtime.close();
@@ -240,37 +256,15 @@ describe("Knapsack patch-deferred Files module", () => {
     expect(observed.at(-1)?.context).toBe(observed.at(-2)?.context);
   });
 
-  it("executes list, glob, and grep bindings through the same execute door", async () => {
+  it("executes the glob binding through the same execute door", async () => {
     const port = memoryPort("hello").port;
-    await expect(executeInner(port, "list", { path: "docs" })).resolves.toEqual(
-      {
-        content: [
-          {
-            type: "text",
-            text: '{"path":"docs","entries":[],"truncated":false}',
-          },
-        ],
-        isError: false,
-      },
-    );
     await expect(
       executeInner(port, "glob", { path: "docs", pattern: "*.md" }),
     ).resolves.toEqual({
       content: [
         {
           type: "text",
-          text: '{"path":"docs","matches":[],"truncated":false}',
-        },
-      ],
-      isError: false,
-    });
-    await expect(
-      executeInner(port, "grep", { path: "docs", pattern: "hello" }),
-    ).resolves.toEqual({
-      content: [
-        {
-          type: "text",
-          text: '{"path":"docs","matches":[],"truncated":false}',
+          text: '{"path":"docs","results":[],"truncated":null}',
         },
       ],
       isError: false,
@@ -459,8 +453,8 @@ describe("Knapsack patch-deferred Files module", () => {
 
 async function directResult(
   port: FilesPort,
-  name: "read" | "list" | "glob" | "grep",
-  args: { path: string; pattern?: string },
+  name: Exclude<FileToolName, "apply_patch">,
+  args: Parameters<FileTool["prepare"]>[0]["arguments"],
 ) {
   const tool = Knapsack.files({ port }).tools.find(
     (item) => item.descriptor.name === name,
@@ -480,7 +474,7 @@ async function directResult(
   return first.result;
 }
 
-it("offers four direct read-only tools even without patch, using the execute results", async () => {
+it("offers separate list, glob and grep schemas with one-line descriptions and no find tool", async () => {
   const port = memoryPort("hello").port;
   const surface = Knapsack.files({ port });
   expect(surface.tools.map((tool) => tool.descriptor.name)).toEqual([
@@ -489,17 +483,33 @@ it("offers four direct read-only tools even without patch, using the execute res
     "glob",
     "grep",
   ]);
-  const cases = [
-    ["read", { path: "hello.txt" }],
-    ["list", { path: "docs" }],
-    ["glob", { path: "docs", pattern: "*.md" }],
-    ["grep", { path: "docs", pattern: "hello" }],
-  ] as const;
-  for (const [name, args] of cases) {
-    expect(await directResult(port, name, args)).toEqual(
-      await executeInner(port, name, args),
-    );
+  for (const [name, properties, required] of [
+    ["list", ["limit", "path"], []],
+    ["glob", ["limit", "path", "pattern"], ["pattern"]],
+    [
+      "grep",
+      ["ignoreCase", "include", "limit", "path", "pattern", "regex"],
+      ["pattern"],
+    ],
+  ] as const) {
+    const tool = surface.tools.find((entry) => entry.descriptor.name === name);
+    if (tool === undefined) throw new Error(`Missing ${name} tool`);
+    const parameters = z
+      .object({
+        type: z.literal("object"),
+        additionalProperties: z.literal(false),
+        required: z.array(z.string()).optional(),
+        properties: z.record(z.string(), z.unknown()),
+      })
+      .parse(tool.descriptor.parameters);
+    expect(Object.keys(parameters.properties).toSorted()).toEqual(properties);
+    expect(parameters.required ?? []).toEqual(required);
+    expect(tool.descriptor.description.trim()).not.toBe("");
+    expect(tool.descriptor.description).not.toMatch(/[\r\n]/u);
   }
+  expect(await directResult(port, "read", { path: "hello.txt" })).toEqual(
+    await executeInner(port, "read", { path: "hello.txt" }),
+  );
 });
 
 it("keeps apply_patch first when the Files host supplies it", () => {
@@ -511,12 +521,101 @@ it("keeps apply_patch first when the Files host supplies it", () => {
         exitCode: 0,
         stdout: "",
         stderr: "",
-        truncated: false,
+        truncated: false as const,
       }),
   };
   expect(
     Knapsack.files({ port }).tools.map((tool) => tool.descriptor.name),
   ).toEqual(["apply_patch", "read", "list", "glob", "grep"]);
+});
+
+it("refuses the superseded hybrid search arguments through direct and execute projections", async () => {
+  const port = memoryPort("").port;
+  for (const [name, args] of [
+    ["list", { path: ".", contains: "hello" }],
+    ["glob", { path: ".", name: "*.ts" }],
+    ["grep", { path: ".", contains: "hello" }],
+  ] as const) {
+    await expect(directResult(port, name, args)).rejects.toThrow();
+    await expect(executeInner(port, name, args)).rejects.toThrow();
+  }
+});
+
+it("names the shared ignore policy in every search description", () => {
+  const surface = Knapsack.files({ port: memoryPort("").port });
+  for (const name of ["list", "glob", "grep"]) {
+    const description = surface.tools.find(
+      (entry) => entry.descriptor.name === name,
+    )?.descriptor.description;
+    expect(description).toContain("Search skips .git and gitignored paths.");
+  }
+});
+
+it("renders directory entries, glob paths and bounded grep lines with honest truncation", async () => {
+  const long = "x".repeat(600);
+  const port = {
+    ...memoryPort("").port,
+    list: () =>
+      Promise.resolve({
+        path: ".",
+        results: [
+          { path: "src", type: "directory" as const },
+          { path: "src/a.ts", type: "file" as const },
+        ],
+        truncated: "limit" as const,
+      }),
+    glob: () =>
+      Promise.resolve({
+        path: ".",
+        results: [{ path: "src/a.ts", type: "file" as const }],
+        truncated: null,
+      }),
+    grep: () =>
+      Promise.resolve({
+        path: ".",
+        results: [{ path: "src/a.ts", line: 3, text: long }],
+        truncated: "limit" as const,
+      }),
+  };
+  const result = await directResult(port, "list", { path: "." });
+  expect(result.content).toEqual([
+    {
+      type: "text",
+      text: [
+        "src/",
+        "src/a.ts",
+        "[truncated: result limit reached; raise limit or narrow path]",
+      ].join("\n"),
+    },
+  ]);
+  expect(await directResult(port, "glob", { pattern: "*.ts" })).toEqual({
+    content: [{ type: "text", text: "src/a.ts" }],
+    isError: false,
+  });
+  expect(await directResult(port, "grep", { pattern: "x" })).toEqual({
+    content: [
+      {
+        type: "text",
+        text: `src/a.ts:3: ${"x".repeat(500)}…\n[truncated: result limit reached; raise limit or narrow path]`,
+      },
+    ],
+    isError: false,
+  });
+  const scanned = await directResult(
+    {
+      ...port,
+      grep: () =>
+        Promise.resolve({ path: ".", results: [], truncated: "scan" as const }),
+    },
+    "grep",
+    { path: ".", pattern: "x" },
+  );
+  expect(scanned.content).toEqual([
+    {
+      type: "text",
+      text: "[truncated: scan limit reached before the search finished; narrow path]",
+    },
+  ]);
 });
 
 it("labels every Files operation and direct tool so a read grant keeps reads and refuses writes", async () => {
@@ -529,7 +628,7 @@ it("labels every Files operation and direct tool so a read grant keeps reads and
         exitCode: 0,
         stdout: "",
         stderr: "",
-        truncated: false,
+        truncated: false as const,
       }),
   };
   const surface = Knapsack.files({ port });
@@ -556,7 +655,7 @@ it("labels every Files operation and direct tool so a read grant keeps reads and
       for (const [name, input] of [
         ["read", { path: "a", offset: 0, limit: 10 }],
         ["list", { path: "." }],
-        ["glob", { path: ".", pattern: "*" }],
+        ["glob", { path: ".", pattern: "*.txt" }],
         ["grep", { path: ".", pattern: "h" }],
         ["edit", { path: "a", oldText: "hello", newText: "bye" }],
         ["patch", { patch: "" }],
@@ -658,10 +757,19 @@ it("presents apply_patch parameters from the same Zod decoder as files.patch", a
       truncated: false,
     });
   const port = { ...memoryPort("").port, patch };
-  const [tool] = Knapsack.files({ port }).tools;
+  const { tools } = Knapsack.files({ port });
+  expect(tools.map(({ descriptor }) => descriptor.name).sort()).toEqual([
+    "apply_patch",
+    "glob",
+    "grep",
+    "list",
+    "read",
+  ]);
+  for (const fileTool of tools)
+    expect(fileTool.descriptor.parameters).not.toHaveProperty("$schema");
+  const [tool] = tools;
   if (tool === undefined) throw new Error("Patch tool missing");
   expect(tool.descriptor.parameters).toEqual({
-    $schema: "https://json-schema.org/draft/2020-12/schema",
     type: "object",
     properties: {
       patch: {
@@ -688,4 +796,113 @@ it("presents apply_patch parameters from the same Zod decoder as files.patch", a
   const bound = "Text exceeds the 131072-byte Files bound";
   expect(direct.message).toContain(bound);
   await expect(executeInner(port, "patch", oversized)).rejects.toThrow(bound);
+});
+
+it("returns an image read as an image part the model can look at, with the cap in the description", async () => {
+  const memory = memoryPort("hello");
+  const port: FilesPort = {
+    ...memory.port,
+    read: (input) =>
+      Promise.resolve({
+        path: input.path,
+        image: { mimeType: "image/png", data: "iVBORw==", bytes: 4 },
+      }),
+  };
+  const result = await directResult(port, "read", { path: "shot.png" });
+  expect(result.isError).toBe(false);
+  expect(result.content).toEqual([
+    {
+      type: "text",
+      text: '{"path":"shot.png","mimeType":"image/png","bytes":4}',
+    },
+    { type: "image", data: "iVBORw==", mimeType: "image/png" },
+  ]);
+  const read = Knapsack.files({ port }).tools.find(
+    (tool) => tool.descriptor.name === "read",
+  );
+  expect(read?.descriptor.description).toContain("512 KiB");
+});
+
+it("refuses to edit an image with a typed not-text failure", async () => {
+  const memory = memoryPort("hello");
+  const port: FilesPort = {
+    ...memory.port,
+    read: (input) =>
+      Promise.resolve({
+        path: input.path,
+        image: { mimeType: "image/png", data: "iVBORw==", bytes: 4 },
+      }),
+  };
+  expect(
+    await editFailure(port, { path: "shot.png", oldText: "a", newText: "b" }),
+  ).toMatchObject({ error: { kind: "not-text", path: "shot.png" } });
+});
+
+const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function imagePort(): FilesPort {
+  return {
+    ...memoryPort("hello").port,
+    read: (input) =>
+      Promise.resolve({
+        path: input.path,
+        image: { mimeType: "image/png", data: "iVBORw==", bytes: 4 },
+      }),
+  };
+}
+
+it("shows an image read inside execute through the image collector, never as base64 in the value", async () => {
+  const { content, isError } = await executeAll(imagePort(), "read", {
+    path: "shot.png",
+  });
+  expect(isError).toBe(false);
+  expect(content).toHaveLength(2);
+  const [text, image] = content;
+  expect(text).toEqual({
+    type: "text",
+    text: '{"path":"shot.png","image":{"ref":"img_0","mimeType":"image/png","bytes":4}}',
+  });
+  expect(image).toEqual({
+    type: "image",
+    data: "iVBORw==",
+    mimeType: "image/png",
+  });
+});
+
+it("recognises only full image signatures", () => {
+  const bytes = (text: string) => new TextEncoder().encode(text);
+  expect(sniffImageMimeType(Uint8Array.from(pngBytes))).toBe("image/png");
+  expect(sniffImageMimeType(bytes("GIF89a\u0001\u0000"))).toBe("image/gif");
+  expect(sniffImageMimeType(bytes("GIF87a\u0001\u0000"))).toBe("image/gif");
+  expect(sniffImageMimeType(bytes("GIF8 is a text file"))).toBeUndefined();
+  expect(sniffImageMimeType(bytes("\u0089PNG is text"))).toBeUndefined();
+  expect(
+    sniffImageMimeType(bytes("RIFF\u0004\u0000\u0000\u0000WEBPVP8 ")),
+  ).toBe("image/webp");
+});
+
+it("stops showing images from the direct read tool after the per-run limit", async () => {
+  const read = Knapsack.files({ port: imagePort() }).tools.find(
+    (tool) => tool.descriptor.name === "read",
+  );
+  if (read === undefined) throw new Error("Missing read tool");
+  const results = [];
+  for (let index = 0; index < 9; index += 1) {
+    const prepared = await Effect.runPromise(
+      read.prepare({
+        type: "toolCall",
+        id: `read-${String(index)}`,
+        name: "read",
+        arguments: { path: "shot.png" },
+      }),
+    );
+    const [part] = await Effect.runPromise(
+      Stream.runCollect(prepared.execute()),
+    );
+    if (part?.type !== "result") throw new Error("Expected result");
+    results.push(part.result);
+  }
+  expect(results.slice(0, 8).every(({ isError }) => !isError)).toBe(true);
+  expect(results[8]?.isError).toBe(true);
+  expect(JSON.stringify(results[8])).toContain("Image limit reached");
 });

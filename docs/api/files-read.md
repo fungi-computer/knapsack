@@ -20,10 +20,31 @@ Maximum UTF-8 byte length of a Files text page.
 
 ---
 
+### maximumImageBytes
+
+```ts
+const maximumImageBytes: number;
+```
+
+Maximum byte length of an image the read tool returns; a host refuses an image
+it cannot bring within it.
+
+---
+
+### imageSniffBytes
+
+```ts
+const imageSniffBytes: 12 = 12;
+```
+
+Bytes needed at the start of a file to recognise a supported image.
+
+---
+
 ### pathSchema
 
 ```ts
-const pathSchema: ZodString;
+const pathSchema: ZodLazy<ZodString>;
 ```
 
 Nonempty file path bounded to 4,096 characters, without null bytes.
@@ -33,13 +54,15 @@ Nonempty file path bounded to 4,096 characters, without null bytes.
 ### readInputSchema
 
 ```ts
-const readInputSchema: ZodObject<
-  {
-    path: ZodString;
-    offset: ZodDefault<ZodNumber>;
-    limit: ZodDefault<ZodNumber>;
-  },
-  $strict
+const readInputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodLazy<ZodString>;
+      offset: ZodDefault<ZodNumber>;
+      limit: ZodDefault<ZodNumber>;
+    },
+    $strict
+  >
 >;
 ```
 
@@ -47,33 +70,213 @@ Canonical bounded Files read request and result, shared with display consumers.
 
 ---
 
-### readOutputSchema
+### readImageMimeType
 
 ```ts
-const readOutputSchema: ZodObject<
-  {
-    path: ZodString;
-    content: ZodString;
-    offset: ZodNumber;
-    nextOffset: ZodNullable<ZodNumber>;
-    truncated: ZodBoolean;
-    file: ZodExactOptional<
-      ZodObject<
-        {
-          computerId: ZodString;
-          path: ZodString;
-        },
-        $strict
-      >
-    >;
-  },
-  $strict
+const readImageMimeType: ZodEnum<{
+  image/png: "image/png";
+  image/jpeg: "image/jpeg";
+  image/gif: "image/gif";
+  image/webp: "image/webp";
+}>;
+```
+
+The image types a Files read can return.
+
+---
+
+### readImageOutputSchema
+
+```ts
+const readImageOutputSchema: ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  image: ZodObject<{
+     mimeType: ZodEnum<{
+        image/png: "image/png";
+        image/jpeg: "image/jpeg";
+        image/gif: "image/gif";
+        image/webp: "image/webp";
+     }>;
+     data: ZodBase64;
+     bytes: ZodNumber;
+  }, $strict>;
+  file: ZodExactOptional<ZodLazy<ZodObject<{
+     computerId: ZodString;
+     path: ZodLazy<ZodString>;
+  }, $strict>>>;
+}, $strict>>;
+```
+
+Whole png, jpeg, gif or webp file, at most `maximumImageBytes`, as base64.
+
+---
+
+### readTextOutputSchema
+
+```ts
+const readTextOutputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodLazy<ZodString>;
+      content: ZodString;
+      offset: ZodNumber;
+      nextOffset: ZodNullable<ZodNumber>;
+      truncated: ZodBoolean;
+      file: ZodExactOptional<
+        ZodLazy<
+          ZodObject<
+            {
+              computerId: ZodString;
+              path: ZodLazy<ZodString>;
+            },
+            $strict
+          >
+        >
+      >;
+    },
+    $strict
+  >
 >;
 ```
 
 Bounded text page, continuation offset and optional hosted file identity.
 
+---
+
+### readImageCaptionSchema
+
+```ts
+const readImageCaptionSchema: ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  image: ZodObject<{
+     ref: ZodString;
+     mimeType: ZodEnum<{
+        image/png: "image/png";
+        image/jpeg: "image/jpeg";
+        image/gif: "image/gif";
+        image/webp: "image/webp";
+     }>;
+     bytes: ZodNumber;
+  }, $strict>;
+}, $strict>>;
+```
+
+What guest code and MCP callers see: an image never travels as base64 in the
+value. It is pushed through the execution's image collector and the value is
+only this caption.
+
+---
+
+### readGuestOutputSchema
+
+```ts
+const readGuestOutputSchema: ZodLazy<ZodUnion<readonly [ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  content: ZodString;
+  offset: ZodNumber;
+  nextOffset: ZodNullable<ZodNumber>;
+  truncated: ZodBoolean;
+  file: ZodExactOptional<ZodLazy<ZodObject<{
+     computerId: ZodString;
+     path: ZodLazy<...>;
+  }, $strict>>>;
+}, $strict>>, ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  image: ZodObject<{
+     ref: ZodString;
+     mimeType: ZodEnum<{
+        image/png: "image/png";
+        image/jpeg: "image/jpeg";
+        image/gif: "image/gif";
+        image/webp: "image/webp";
+     }>;
+     bytes: ZodNumber;
+  }, $strict>;
+}, $strict>>]>>;
+```
+
+Text page or image caption returned to guest code.
+
+---
+
+### readOutputSchema
+
+```ts
+const readOutputSchema: ZodLazy<ZodUnion<readonly [ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  content: ZodString;
+  offset: ZodNumber;
+  nextOffset: ZodNullable<ZodNumber>;
+  truncated: ZodBoolean;
+  file: ZodExactOptional<ZodLazy<ZodObject<{
+     computerId: ZodString;
+     path: ZodLazy<...>;
+  }, $strict>>>;
+}, $strict>>, ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
+  image: ZodObject<{
+     mimeType: ZodEnum<{
+        image/png: "image/png";
+        image/jpeg: "image/jpeg";
+        image/gif: "image/gif";
+        image/webp: "image/webp";
+     }>;
+     data: ZodBase64;
+     bytes: ZodNumber;
+  }, $strict>;
+  file: ZodExactOptional<ZodLazy<ZodObject<{
+     computerId: ZodString;
+     path: ZodLazy<...>;
+  }, $strict>>>;
+}, $strict>>]>>;
+```
+
+A bounded text page or a whole image; images are only read from offset 0.
+
 ## Functions
+
+### sniffImageMimeType()
+
+```ts
+function sniffImageMimeType(head): string | undefined;
+```
+
+Identify png, jpeg, gif or webp by their full magic bytes; `undefined` means not
+a supported image.
+
+#### Parameters
+
+| Parameter | Type         |
+| --------- | ------------ |
+| `head`    | `Uint8Array` |
+
+#### Returns
+
+`string` \| `undefined`
+
+---
+
+### imageTooLargeMessage()
+
+```ts
+function imageTooLargeMessage(path, size, limit): string;
+```
+
+Message for an image above a host's read cap, shared by every Files host.
+
+#### Parameters
+
+| Parameter | Type     |
+| --------- | -------- |
+| `path`    | `string` |
+| `size`    | `number` |
+| `limit`   | `number` |
+
+#### Returns
+
+`string`
+
+---
 
 ### boundedTextSchema()
 
@@ -92,3 +295,36 @@ Validate text against a minimum character length and the Files UTF-8 byte limit.
 #### Returns
 
 `ZodString`
+
+---
+
+### imageReadResult()
+
+```ts
+function imageReadResult(path, mimeType, bytes): object;
+```
+
+Build the image read result for a recognised image's complete bytes.
+
+#### Parameters
+
+| Parameter  | Type         |
+| ---------- | ------------ |
+| `path`     | `string`     |
+| `mimeType` | `string`     |
+| `bytes`    | `Uint8Array` |
+
+#### Returns
+
+`object`
+
+| Name              | Type                                                               | Default value       |
+| ----------------- | ------------------------------------------------------------------ | ------------------- |
+| `path`            | `string`                                                           | `pathSchema`        |
+| `image`           | `object`                                                           | -                   |
+| `image.mimeType`  | `"image/png"` \| `"image/jpeg"` \| `"image/gif"` \| `"image/webp"` | `readImageMimeType` |
+| `image.data`      | `string`                                                           | -                   |
+| `image.bytes`     | `number`                                                           | -                   |
+| `file?`           | `object`                                                           | -                   |
+| `file.computerId` | `string`                                                           | -                   |
+| `file.path`       | `string`                                                           | -                   |

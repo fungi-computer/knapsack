@@ -9,28 +9,57 @@
     "package/dist/files-read-codec.js",
     "package/dist/files-read.d.ts",
     "package/dist/files-read.js",
+    "package/dist/files-search.d.ts",
+    "package/dist/files-search.js",
     "package/dist/files.d.ts",
     "package/dist/files.js",
     "package/dist/index.d.ts",
     "package/dist/index.js",
+    "package/dist/mcp.d.ts",
+    "package/dist/mcp.js",
     "package/dist/patch-grammar.d.ts",
     "package/dist/patch-grammar.js",
     "package/dist/patch.d.ts",
     "package/dist/patch.js",
+    "package/dist/ui-browser.d.ts",
+    "package/dist/ui-browser.js",
+    "package/dist/ui.d.ts",
+    "package/dist/ui.js",
+    "package/dist/ui/browser.d.ts",
+    "package/dist/ui/browser.js",
+    "package/dist/ui/effect.d.ts",
+    "package/dist/ui/effect.js",
+    "package/dist/ui/host.d.ts",
+    "package/dist/ui/host.js",
+    "package/dist/ui/sessions.d.ts",
+    "package/dist/ui/sessions.js",
+    "package/dist/ui/wire.d.ts",
+    "package/dist/ui/wire.js",
     "package/docs/api/README.md",
     "package/docs/api/files-patch.md",
     "package/docs/api/files-read-codec.md",
     "package/docs/api/files-read.md",
     "package/docs/api/index.md",
     "package/docs/api/patch.md",
+    "package/docs/api/ui-browser.md",
     "package/package.json"
   ],
-  "localDependencies": ["../cairn", "../mule", "../mycelium"],
+  "localDependencies": [
+    "../cairn",
+    "../forage",
+    "../mule",
+    "../mycelium",
+    "../whistle"
+  ],
   "consumerDevDependencies": {
     "@modelcontextprotocol/sdk": "1.30.0"
   },
   "runtimeFixture": "test/stranger/runtime.mjs",
-  "typecheckFixture": "test/stranger/consumer.mts",
+  "typechecks": [
+    {
+      "fixture": "test/stranger/consumer.mts"
+    }
+  ],
   "docs": {
     "sigil": "installApps",
     "home": {

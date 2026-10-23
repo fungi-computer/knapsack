@@ -205,6 +205,7 @@ type FilesEditErrorReason =
   | "file-too-large"
   | "partial-character"
   | "unchanged"
+  | "not-text"
   | "conflict";
 ```
 
@@ -244,9 +245,9 @@ signal.
 type FilesPort = Readonly<{
   patch?: FilesPatch;
   read: (input, context) => Promise<z.output<typeof readOutputSchema>>;
-  list: (input, context) => Promise<z.output<typeof listOutputSchema>>;
-  glob: (input, context) => Promise<z.output<typeof globOutputSchema>>;
-  grep: (input, context) => Promise<z.output<typeof grepOutputSchema>>;
+  list: (input, context) => Promise<z.output<typeof searchOutputSchema>>;
+  glob: (input, context) => Promise<z.output<typeof searchOutputSchema>>;
+  grep: (input, context) => Promise<z.output<typeof searchOutputSchema>>;
   replace: (
     input,
     context,
@@ -270,7 +271,7 @@ replacement.
 type FileToolName = "read" | "list" | "glob" | "grep" | "apply_patch";
 ```
 
-Closed set of direct, model-visible Files tools; widening one is an ADR.
+Closed set of direct, model-visible Files tools; changing it is an ADR.
 
 ---
 
@@ -429,145 +430,150 @@ type McpServerUnavailableReason =
 
 Why one MCP server contributed no module to an acquisition.
 
+---
+
+### UiConnectionOptions
+
+```ts
+type UiConnectionOptions = Readonly<{
+  id: string;
+  hasSession: (sessionId) => Promise<boolean>;
+}>;
+```
+
+How one Agent host connects its Sessions' open Apps to Knapsack.ui.
+
+---
+
+### UiConnection
+
+```ts
+type UiConnection = Readonly<{
+  source: CapabilitySource;
+  fetch: (request) => Promise<Response>;
+  close: () => Promise<void>;
+}>;
+```
+
+Live commands of the App open in each Agent Session's browser. The Agent reaches
+them through the `ui` module (`ui.discover`, `ui.execute`); the browser runs
+them through Whistle over the transport this connection serves.
+
 ## Variables
 
 ### listInputSchema
 
 ```ts
-const listInputSchema: ZodObject<
-  {
-    path: ZodString;
-    limit: ZodDefault<ZodNumber>;
-  },
-  $strict
+const listInputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodDefault<ZodLazy<ZodString>>;
+      limit: ZodDefault<ZodNumber>;
+    },
+    $strict
+  >
 >;
 ```
 
-Bounded directory listing request.
-
----
-
-### listOutputSchema
-
-```ts
-const listOutputSchema: ZodObject<
-  {
-    path: ZodString;
-    entries: ZodArray<
-      ZodObject<
-        {
-          path: ZodString;
-          name: ZodString;
-          type: ZodEnum<{
-            file: "file";
-            directory: "directory";
-            symlink: "symlink";
-          }>;
-          size: ZodNumber;
-          modifiedAt: ZodNumber;
-        },
-        $strict
-      >
-    >;
-    truncated: ZodBoolean;
-  },
-  $strict
->;
-```
-
-Directory entries and an explicit truncation flag.
+List one directory level.
 
 ---
 
 ### globInputSchema
 
 ```ts
-const globInputSchema: ZodObject<
-  {
-    path: ZodString;
-    pattern: ZodString;
-    limit: ZodDefault<ZodNumber>;
-  },
-  $strict
+const globInputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodDefault<ZodLazy<ZodString>>;
+      pattern: ZodString;
+      limit: ZodDefault<ZodNumber>;
+    },
+    $strict
+  >
 >;
 ```
 
-Bounded path-pattern search request.
-
----
-
-### globOutputSchema
-
-```ts
-const globOutputSchema: ZodObject<
-  {
-    path: ZodString;
-    matches: ZodArray<ZodString>;
-    truncated: ZodBoolean;
-  },
-  $strict
->;
-```
-
-Matching paths and an explicit truncation flag.
+Match paths below a directory by glob.
 
 ---
 
 ### grepInputSchema
 
 ```ts
-const grepInputSchema: ZodObject<
-  {
-    path: ZodString;
-    pattern: ZodString;
-    regex: ZodDefault<ZodBoolean>;
-    ignoreCase: ZodDefault<ZodBoolean>;
-    limit: ZodDefault<ZodNumber>;
-  },
-  $strict
+const grepInputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodDefault<ZodLazy<ZodString>>;
+      pattern: ZodString;
+      include: ZodOptional<ZodString>;
+      regex: ZodDefault<ZodBoolean>;
+      ignoreCase: ZodDefault<ZodBoolean>;
+      limit: ZodDefault<ZodNumber>;
+    },
+    $strict
+  >
 >;
 ```
 
-Bounded content-search request with optional regular-expression matching.
+Search file content, optionally restricted to matching paths.
 
 ---
 
-### grepOutputSchema
+### searchOutputSchema
 
 ```ts
-const grepOutputSchema: ZodObject<
-  {
-    path: ZodString;
-    matches: ZodArray<
-      ZodObject<
-        {
-          path: ZodString;
-          line: ZodNumber;
-          text: ZodString;
-        },
-        $strict
-      >
-    >;
-    truncated: ZodBoolean;
-  },
-  $strict
+const searchOutputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodLazy<ZodString>;
+      results: ZodArray<
+        ZodLazy<
+          ZodObject<
+            {
+              path: ZodLazy<ZodString>;
+              type: ZodExactOptional<
+                ZodEnum<{
+                  file: "file";
+                  directory: "directory";
+                  symlink: "symlink";
+                }>
+              >;
+              line: ZodExactOptional<ZodNumber>;
+              text: ZodExactOptional<ZodString>;
+            },
+            $strict
+          >
+        >
+      >;
+      truncated: ZodNullable<
+        ZodEnum<{
+          limit: "limit";
+          scan: "scan";
+        }>
+      >;
+    },
+    $strict
+  >
 >;
 ```
 
-Content matches and an explicit truncation flag.
+Found paths or matching lines, and which cap (if any) cut the search short.
 
 ---
 
 ### editInputSchema
 
 ```ts
-const editInputSchema: ZodObject<
-  {
-    path: ZodString;
-    oldText: ZodString;
-    newText: ZodString;
-  },
-  $strict
+const editInputSchema: ZodLazy<
+  ZodObject<
+    {
+      path: ZodLazy<ZodString>;
+      oldText: ZodString;
+      newText: ZodString;
+    },
+    $strict
+  >
 >;
 ```
 
@@ -578,7 +584,7 @@ Text replacement request decoded before the captured Files port is called.
 ### filesEditFailureSchema
 
 ```ts
-const filesEditFailureSchema: ZodObject<{
+const filesEditFailureSchema: ZodLazy<ZodObject<{
   status: ZodLiteral<"failed">;
   error: ZodObject<{
      kind: ZodEnum<{
@@ -587,12 +593,13 @@ const filesEditFailureSchema: ZodObject<{
         file-too-large: "file-too-large";
         partial-character: "partial-character";
         unchanged: "unchanged";
+        not-text: "not-text";
         conflict: "conflict";
      }>;
-     path: ZodString;
+     path: ZodLazy<ZodString>;
      message: ZodString;
   }, $strict>;
-}, $strict>;
+}, $strict>>;
 ```
 
 Structured edit refusal, including its reason and affected path.
@@ -602,8 +609,8 @@ Structured edit refusal, including its reason and affected path.
 ### editOutputSchema
 
 ```ts
-const editOutputSchema: ZodUnion<readonly [ZodObject<{
-  path: ZodString;
+const editOutputSchema: ZodUnion<readonly [ZodLazy<ZodObject<{
+  path: ZodLazy<ZodString>;
   bytes: ZodNumber;
   diff: ZodString;
   firstChangedLine: ZodNullable<ZodNumber>;
@@ -612,7 +619,7 @@ const editOutputSchema: ZodUnion<readonly [ZodObject<{
   unifiedPatchAddedLines: ZodNumber;
   unifiedPatchRemovedLines: ZodNumber;
   unifiedPatchTruncated: ZodBoolean;
-}, $strict>, ZodObject<{
+}, $strict>>, ZodLazy<ZodObject<{
   status: ZodLiteral<"failed">;
   error: ZodObject<{
      kind: ZodEnum<{
@@ -621,12 +628,13 @@ const editOutputSchema: ZodUnion<readonly [ZodObject<{
         file-too-large: "file-too-large";
         partial-character: "partial-character";
         unchanged: "unchanged";
+        not-text: "not-text";
         conflict: "conflict";
      }>;
-     path: ZodString;
+     path: ZodLazy<ZodString>;
      message: ZodString;
   }, $strict>;
-}, $strict>]>;
+}, $strict>>]>;
 ```
 
 Successful edit metadata or a typed edit refusal.
@@ -641,6 +649,7 @@ const Knapsack: Readonly<{
   computers: (input) => CapabilitySource;
   files: (input) => FilesSurface;
   mcpServers: (input) => CapabilitySource;
+  ui: (options) => UiConnection;
 }>;
 ```
 
@@ -676,6 +685,7 @@ function edit(
           | "file-too-large"
           | "partial-character"
           | "unchanged"
+          | "not-text"
           | "conflict";
         path: string;
         message: string;
@@ -705,8 +715,92 @@ captured FilesPort.
 `unifiedPatchBytes`: `number`; `unifiedPatchAddedLines`: `number`;
 `unifiedPatchRemovedLines`: `number`; `unifiedPatchTruncated`: `boolean`; \} \|
 \{ `status`: `"failed"`; `error`: \{ `kind`: \| `"not-found"` \| `"ambiguous"`
-\| `"file-too-large"` \| `"partial-character"` \| `"unchanged"` \| `"conflict"`;
-`path`: `string`; `message`: `string`; \}; \}\>
+\| `"file-too-large"` \| `"partial-character"` \| `"unchanged"` \| `"not-text"`
+\| `"conflict"`; `path`: `string`; `message`: `string`; \}; \}\>
+
+---
+
+### presentReadForGuest()
+
+```ts
+function presentReadForGuest(
+  result,
+  context,
+):
+  | {
+      path: string;
+      content: string;
+      offset: number;
+      nextOffset: number | null;
+      truncated: boolean;
+      file?: {
+        computerId: string;
+        path: string;
+      };
+    }
+  | {
+      path: string;
+      image: {
+        ref: string;
+        mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+        bytes: number;
+      };
+    };
+```
+
+Guest code and MCP callers never receive base64: the image goes through the
+execution's image collector (the `images.view` path) and the value is a caption.
+
+#### Parameters
+
+| Parameter | Type                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `result`  | \| \{ `path`: `string`; `content`: `string`; `offset`: `number`; `nextOffset`: `number` \| `null`; `truncated`: `boolean`; `file?`: \{ `computerId`: `string`; `path`: `string`; \}; \} \| \{ `path`: `string`; `image`: \{ `mimeType`: `"image/png"` \| `"image/jpeg"` \| `"image/gif"` \| `"image/webp"`; `data`: `string`; `bytes`: `number`; \}; `file?`: \{ `computerId`: `string`; `path`: `string`; \}; \} |
+| `context` | `InvocationContext`                                                                                                                                                                                                                                                                                                                                                                                               |
+
+#### Returns
+
+##### Type Literal
+
+```ts
+{
+  path: string;
+  content: string;
+  offset: number;
+  nextOffset: number | null;
+  truncated: boolean;
+  file?: {
+     computerId: string;
+     path: string;
+  };
+}
+```
+
+| Name              | Type               | Default value | Description                                                                      |
+| ----------------- | ------------------ | ------------- | -------------------------------------------------------------------------------- |
+| `path`            | `string`           | `pathSchema`  | -                                                                                |
+| `content`         | `string`           | -             | -                                                                                |
+| `offset`          | `number`           | -             | -                                                                                |
+| `nextOffset`      | `number` \| `null` | -             | -                                                                                |
+| `truncated`       | `boolean`          | -             | -                                                                                |
+| `file?`           | `object`           | -             | Captured hosted file identity; a local Files host may have no Computer identity. |
+| `file.computerId` | `string`           | -             | -                                                                                |
+| `file.path`       | `string`           | -             | -                                                                                |
+
+---
+
+##### Type Literal
+
+```ts
+{
+  path: string;
+  image: {
+    ref: string;
+    mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    bytes: number;
+  }
+}
+```
 
 ## References
 
@@ -719,6 +813,12 @@ Re-exports [readInputSchema](files-read.md#readinputschema)
 ### readOutputSchema
 
 Re-exports [readOutputSchema](files-read.md#readoutputschema)
+
+---
+
+### readGuestOutputSchema
+
+Re-exports [readGuestOutputSchema](files-read.md#readguestoutputschema)
 
 ---
 

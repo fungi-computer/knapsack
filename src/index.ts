@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import { files, type FilesConnectionOptions } from "./files.js";
 import { mcpServers } from "./mcp.js";
+import { ui } from "./ui.js";
 
 const maximumCapabilities = 256;
 const describeConcurrency = 8;
@@ -300,7 +301,11 @@ export const Knapsack = Object.freeze({
   files,
   /** Connect a changing list of remote MCP servers, reporting unavailable ones independently. */
   mcpServers,
+  /** Connect the open App's live Whistle commands to each Agent Session. */
+  ui,
 });
+
+export type { UiConnection, UiConnectionOptions } from "./ui.js";
 
 export {
   McpServerUnavailableError,
@@ -321,11 +326,11 @@ export {
   readInputSchema,
   readOutputSchema,
   listInputSchema,
-  listOutputSchema,
   globInputSchema,
-  globOutputSchema,
   grepInputSchema,
-  grepOutputSchema,
+  searchOutputSchema,
+  readGuestOutputSchema,
+  presentReadForGuest,
   editInputSchema,
   editOutputSchema,
   patchInputSchema,

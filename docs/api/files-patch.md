@@ -13,11 +13,13 @@
 ### patchInputSchema
 
 ```ts
-const patchInputSchema: ZodObject<
-  {
-    patch: ZodString;
-  },
-  $strict
+const patchInputSchema: ZodLazy<
+  ZodObject<
+    {
+      patch: ZodString;
+    },
+    $strict
+  >
 >;
 ```
 
@@ -28,44 +30,38 @@ Browser-safe patch contracts shared by native Files tools and Computer HTTP.
 ### patchOutputSchema
 
 ```ts
-const patchOutputSchema: ZodUnion<
-  readonly [
-    ZodObject<
-      {
-        status: ZodEnum<{
-          completed: "completed";
-          failed: "failed";
-          cancelled: "cancelled";
-        }>;
-        exitCode: ZodNumber;
-        stdout: ZodString;
-        stderr: ZodString;
-        truncated: ZodBoolean;
-      },
-      $strict
-    >,
-    ZodObject<
-      {
-        status: ZodEnum<{
-          completed: "completed";
-          failed: "failed";
-          cancelled: "cancelled";
-        }>;
-        exitCode: ZodNumber;
-        stdout: ZodString;
-        stderr: ZodString;
-        truncated: ZodBoolean;
-        error: ZodObject<
-          {
-            kind: ZodLiteral<"mismatch">;
-          },
-          $strict
-        >;
-      },
-      $strict
-    >,
-  ]
->;
+const patchOutputSchema: ZodLazy<ZodUnion<readonly [ZodObject<{
+  status: ZodEnum<{
+     completed: "completed";
+     failed: "failed";
+     cancelled: "cancelled";
+  }>;
+  exitCode: ZodNumber;
+  stdout: ZodString;
+  stderr: ZodString;
+  truncated: ZodUnion<readonly [ZodLiteral<false>, ZodArray<ZodObject<{
+     stream: ZodEnum<...>;
+     keptBytes: ZodNumber;
+     totalBytes: ZodNumber;
+  }, $strict>>]>;
+}, $strict>, ZodObject<{
+  status: ZodEnum<{
+     completed: "completed";
+     failed: "failed";
+     cancelled: "cancelled";
+  }>;
+  exitCode: ZodNumber;
+  stdout: ZodString;
+  stderr: ZodString;
+  truncated: ZodUnion<readonly [ZodLiteral<false>, ZodArray<ZodObject<{
+     stream: ZodEnum<...>;
+     keptBytes: ZodNumber;
+     totalBytes: ZodNumber;
+  }, $strict>>]>;
+  error: ZodObject<{
+     kind: ZodLiteral<"mismatch">;
+  }, $strict>;
+}, $strict>]>>;
 ```
 
 Native patch completion, cancellation or failure, including an optional

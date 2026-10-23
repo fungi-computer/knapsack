@@ -76,9 +76,9 @@ const filesPort: FilesPort = {
       nextOffset: null,
       truncated: false,
     }),
-  list: ({ path }) => Promise.resolve({ path, entries: [], truncated: false }),
-  glob: ({ path }) => Promise.resolve({ path, matches: [], truncated: false }),
-  grep: ({ path }) => Promise.resolve({ path, matches: [], truncated: false }),
+  list: ({ path }) => Promise.resolve({ path, results: [], truncated: null }),
+  glob: ({ path }) => Promise.resolve({ path, results: [], truncated: null }),
+  grep: ({ path }) => Promise.resolve({ path, results: [], truncated: null }),
   replace: ({ path, content }) =>
     Promise.resolve({ path, bytes: content.length }),
 };

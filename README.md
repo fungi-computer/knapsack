@@ -36,12 +36,28 @@ catalog or a result. Servers connect concurrently under a timeout. One that
 rejects, refuses its credential, times out or advertises an unusable list is
 dropped and reported through `onUnavailable`, while the others stay available.
 
+`Knapsack.ui({ id, hasSession })` connects the App open in an Agent Session's
+browser. Its `source` lends each Session run the `ui` module: `ui.discover`
+lists the App's live Whistle commands (its agent projection) and `ui.execute`
+runs one. The run returns the module when it ends. Its `fetch` serves
+`/browser/sessions/<sessionId>/browser/{events,claims,results}`: the browser
+claims each request before it runs it, and the host accepts only the matching
+result. The browser side is `connectBrowser({ baseUrl, whistle })` from
+`@fungi.computer/knapsack/ui/browser`.
+
 Knapsack does not own model loops, tool execution policy, Computer storage, or
 provider-specific operations.
 
 `@fungi.computer/knapsack/files-patch` exposes the same patch input/output
 contracts without loading tool connections or the agent runtime. Browser and
 transport consumers use this subpath.
+
+`@fungi.computer/knapsack/files-search` supplies `SearchVisibility` to Local and
+hosted Files adapters. One invocation-local policy checks canonical
+root-relative search paths (the root and every entry), excludes `.git` path
+components and respects excluded ancestors. Adapters supply bounded ignore-file
+text; maintained `ignore` owns gitignore grammar and nested negation. Exact-path
+reads do not use search visibility.
 
 ## Set up
 
@@ -51,8 +67,9 @@ npm install @fungi.computer/knapsack
 
 The package is an ESM public candidate, not a claim of npm publication. It
 depends on Cairn, Forage, Mule, Mycelium, the MCP SDK client, Effect, Zod and
-`diff`. Its explicit file list contains compiled JavaScript and declarations,
-the API reference, this README and the license texts. It has no install scripts.
+`diff` and `ignore`. Its explicit file list contains compiled JavaScript and
+declarations, the API reference, this README and the license texts. It has no
+install scripts.
 
 ## Quick start: validate a read request
 
@@ -89,6 +106,12 @@ replace atomically or refuse a conflict. A native patch operation is available
 only when that port supplies a patch engine. Paths are validated, not confined
 by Knapsack: the captured host port enforces its own root and authority.
 
+`Knapsack.ui` keeps one browser host per Session, opened by the browser's event
+stream for a stored Session or by a run, and dropped when neither holds it.
+Neither its `fetch` nor the browser's requests are authenticated by Knapsack:
+mount `fetch` behind the host's own admission. `close()` ends every stream;
+later requests answer 410 and later runs fail to borrow.
+
 ## API reference
 
 The [generated reference](docs/api/README.md) covers every public entry:
@@ -100,6 +123,7 @@ The [generated reference](docs/api/README.md) covers every public entry:
 | `/files-read`       | Bounded text read schemas and shared path validation.                                       |
 | `/patch`            | Read Codex patch operations for presentation; the native engine validates and applies them. |
 | `/files-read-codec` | Encode read requests and adapt a framed host transport to the Files read port.              |
+| `/ui/browser`       | Connect an App's Whistle runtime to one Agent Session's `Knapsack.ui` transport.            |
 
 ## Examples and checks
 
@@ -107,8 +131,12 @@ The [generated reference](docs/api/README.md) covers every public entry:
 provider failures and invocation context. [Files tests](test/files.test.ts)
 exercise bounded reads and edits.
 [Read codec tests](test/files-read-codec.test.ts) exercise the framed transport.
-The packed-consumer runtime and typecheck fixtures import only the five public
-entries from an isolated tarball installation.
+[Knapsack.ui tests](test/ui.test.ts) exercise run borrows and teardown; the
+[host](test/ui-host.test.ts), [event stream](test/ui-eventsource.test.ts) and
+[Session host](test/ui-sessions.test.ts) tests cover discovery, execution,
+claims, disconnects and multi-tab delivery. The packed-consumer runtime and
+typecheck fixtures import the root and Files entries from an isolated tarball
+installation.
 
 From a configured repository checkout:
 
@@ -130,6 +158,11 @@ Files reads and patch inputs are bounded to 128 KiB of UTF-8 text. Listing and
 search results contain at most 256 entries and expose truncation. Schemas reject
 invalid requests and results. `FilesEditError` distinguishes conflicts, missing
 or ambiguous matches, oversized files and partial-character edits.
+
+One Session's browser serves one outstanding request: a second gets
+`browser_busy`, a missing browser `browser_not_connected`. If the browser
+disconnects after it claimed an execution, the result is
+`browser_execution_indeterminate`, because the command may already have run.
 
 ## Contribute and license
 

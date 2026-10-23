@@ -1,12 +1,17 @@
 import { nanoid } from "@fungi.computer/cairn";
 import {
+  MAX_EXECUTION_IMAGES,
   Mycelium,
   type Access,
   type InvocationContext,
   type LabelledTool,
   type ModuleRegistration,
 } from "@fungi.computer/mycelium";
-import type { MuleTool, MuleError } from "@fungi.computer/mule/effect";
+import type {
+  MuleTool,
+  MuleError,
+  MuleToolResult,
+} from "@fungi.computer/mule/effect";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import { patchInputSchema, patchOutputSchema } from "./files-patch.js";
@@ -16,16 +21,21 @@ import { diffLines, formatPatch, structuredPatch } from "diff";
 import { z } from "zod";
 
 import {
+  maximumImageBytes,
   maximumReadBytes,
   pathSchema,
   boundedTextSchema,
   readInputSchema,
+  readGuestOutputSchema,
   readOutputSchema,
 } from "./files-read.js";
-export { readInputSchema, readOutputSchema };
+export { readGuestOutputSchema, readInputSchema, readOutputSchema };
 const maximumPatternCharacters = 512;
 const maximumResultEntries = 256;
+const defaultSearchResults = 100;
+const maximumFoundLineCharacters = 500;
 const maximumReadBytesText = String(maximumReadBytes);
+const readDescription = `Read one bounded UTF-8 file page, or a whole png, jpeg, gif or webp image returned as an image you can look at (sent at most ${String(maximumImageBytes / 1_024)} KiB; the host may shrink it and refuses an image it cannot read or fit).`;
 const maximumUnifiedPatchBytes = 65_536;
 const utf8 = new TextEncoder();
 
@@ -36,6 +46,7 @@ export type FilesEditErrorReason =
   | "file-too-large"
   | "partial-character"
   | "unchanged"
+  | "not-text"
   | "conflict";
 
 /** Expected Files edit refusal, kept distinct from unexpected host failures. */
@@ -50,83 +61,55 @@ export class FilesEditError extends Error {
   }
 }
 
-/** Bounded directory listing request. */
-export const listInputSchema = z.strictObject({
-  path: pathSchema,
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(maximumResultEntries)
-    .default(maximumResultEntries),
-});
-const listEntrySchema = z.lazy(() =>
+const searchLimitSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(maximumResultEntries)
+  .default(defaultSearchResults);
+const searchPatternSchema = z.string().min(1).max(maximumPatternCharacters);
+
+/** List one directory level. */
+export const listInputSchema = z.lazy(() =>
   z.strictObject({
-    path: pathSchema,
-    name: z.string().min(1),
-    type: z.enum(["file", "directory", "symlink"]),
-    size: z.number().int().nonnegative(),
-    modifiedAt: z.number(),
+    path: pathSchema.default("."),
+    limit: searchLimitSchema,
   }),
 );
-/** Directory entries and an explicit truncation flag. */
-export const listOutputSchema = z.lazy(() =>
-  z.strictObject({
-    path: pathSchema,
-    entries: z.array(listEntrySchema).max(maximumResultEntries),
-    truncated: z.boolean(),
-  }),
-);
-/** Bounded path-pattern search request. */
+/** Match paths below a directory by glob. */
 export const globInputSchema = z.lazy(() =>
   z.strictObject({
-    path: pathSchema,
-    pattern: z.string().min(1).max(maximumPatternCharacters),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(maximumResultEntries)
-      .default(maximumResultEntries),
+    path: pathSchema.default("."),
+    pattern: searchPatternSchema,
+    limit: searchLimitSchema,
   }),
 );
-/** Matching paths and an explicit truncation flag. */
-export const globOutputSchema = z.lazy(() =>
-  z.strictObject({
-    path: pathSchema,
-    matches: z.array(pathSchema).max(maximumResultEntries),
-    truncated: z.boolean(),
-  }),
-);
-/** Bounded content-search request with optional regular-expression matching. */
+/** Search file content, optionally restricted to matching paths. */
 export const grepInputSchema = z.lazy(() =>
   z.strictObject({
-    path: pathSchema,
-    pattern: z.string().min(1).max(maximumPatternCharacters),
+    path: pathSchema.default("."),
+    pattern: searchPatternSchema,
+    include: searchPatternSchema.optional(),
     regex: z.boolean().default(false),
     ignoreCase: z.boolean().default(false),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(maximumResultEntries)
-      .default(maximumResultEntries),
+    limit: searchLimitSchema,
   }),
 );
-/** Content matches and an explicit truncation flag. */
-export const grepOutputSchema = z.lazy(() =>
+/** One found path, with the matching line when the search was by content. */
+const foundSchema = z.lazy(() =>
   z.strictObject({
     path: pathSchema,
-    matches: z
-      .array(
-        z.strictObject({
-          path: pathSchema,
-          line: z.number().int().positive(),
-          text: z.string(),
-        }),
-      )
-      .max(maximumResultEntries),
-    truncated: z.boolean(),
+    type: z.enum(["file", "directory", "symlink"]).exactOptional(),
+    line: z.number().int().positive().exactOptional(),
+    text: z.string().exactOptional(),
+  }),
+);
+/** Found paths or matching lines, and which cap (if any) cut the search short. */
+export const searchOutputSchema = z.lazy(() =>
+  z.strictObject({
+    path: pathSchema,
+    results: z.array(foundSchema).max(maximumResultEntries),
+    truncated: z.enum(["limit", "scan"]).nullable(),
   }),
 );
 /** Text replacement request decoded before the captured Files port is called. */
@@ -160,6 +143,7 @@ export const filesEditFailureSchema = z.lazy(() =>
         "ambiguous",
         "file-too-large",
         "partial-character",
+        "not-text",
         "unchanged",
         "conflict",
       ]),
@@ -189,21 +173,21 @@ export type FilesPort = Readonly<{
     input: z.output<typeof readInputSchema>,
     context: InvocationContext,
   ) => Promise<z.output<typeof readOutputSchema>>;
-  /** List bounded directory entries. */
+  /** List one directory level under the admitted root. */
   list: (
     input: z.output<typeof listInputSchema>,
     context: InvocationContext,
-  ) => Promise<z.output<typeof listOutputSchema>>;
-  /** Match bounded paths under the admitted root. */
+  ) => Promise<z.output<typeof searchOutputSchema>>;
+  /** Match paths below the admitted root by glob. */
   glob: (
     input: z.output<typeof globInputSchema>,
     context: InvocationContext,
-  ) => Promise<z.output<typeof globOutputSchema>>;
-  /** Search bounded file content under the admitted root. */
+  ) => Promise<z.output<typeof searchOutputSchema>>;
+  /** Search file content under the admitted root; the host owns the walk. */
   grep: (
     input: z.output<typeof grepInputSchema>,
     context: InvocationContext,
-  ) => Promise<z.output<typeof grepOutputSchema>>;
+  ) => Promise<z.output<typeof searchOutputSchema>>;
   /** Replace atomically only if the stored content still matches the baseline. */
   replace: (
     input: Readonly<{
@@ -215,7 +199,7 @@ export type FilesPort = Readonly<{
   ) => Promise<Readonly<{ path: string; bytes: number }>>;
 }>;
 
-/** Closed set of direct, model-visible Files tools; widening one is an ADR. */
+/** Closed set of direct, model-visible Files tools; changing it is an ADR. */
 export type FileToolName = "read" | "list" | "glob" | "grep" | "apply_patch";
 const fileToolBrand: unique symbol = Symbol("KnapsackFileTool");
 /** The one module id that a host's grant for Files names. */
@@ -463,6 +447,13 @@ async function applyEdit(
       context,
     ),
   );
+  if ("image" in current) {
+    throw new FilesEditError(
+      "not-text",
+      input.path,
+      "file is an image, not editable text",
+    );
+  }
   if (current.truncated) {
     throw new FilesEditError(
       "file-too-large",
@@ -588,6 +579,13 @@ function runPatch(invoke: FilesPatch, input: Parameters<FilesPatch>[0]) {
   return runFileOperation((context) => invoke(input, context));
 }
 
+/** Keep model parameters while omitting the decoder's schema-document marker. */
+function toolParameters(schema: z.ZodType) {
+  const parameters = z.toJSONSchema(schema, { io: "input" });
+  delete parameters.$schema;
+  return parameters;
+}
+
 /** Direct presentation of the same validated Files operation. */
 function patchTool(invokePatch: FilesPatch): FileTool {
   const tool: MuleTool & FileTool = {
@@ -600,7 +598,7 @@ function patchTool(invokePatch: FilesPatch): FileTool {
       description:
         "Apply a Codex patch to the selected Files root. Example:\n*** Begin Patch\n*** Update File: path/to/file\n@@\n context line\n-old line\n+new line\n*** End Patch\nUse @@ alone or followed by an existing context line; unified-diff @@ line numbers are not supported. Add/Delete File and optional Move to are also supported. Paths stay inside the root; symlinks and parent traversal are rejected. A failure returns recovery guidance and may follow earlier file writes; inspect the result before retrying. Prefer this to shell or Python replacement.",
       // Model-facing parameters derived from the one Zod decoder `prepare` uses.
-      parameters: z.toJSONSchema(patchInputSchema),
+      parameters: toolParameters(patchInputSchema),
       constrainedSampling: {
         type: "grammar",
         variants: { openai_lark: patchGrammar },
@@ -639,9 +637,129 @@ function patchTool(invokePatch: FilesPatch): FileTool {
   return tool;
 }
 
+// One explicit scope difference, shared by both projections of each search.
+const searchScopeDescription = "Search skips .git and gitignored paths.";
+const searchDescriptions = {
+  list: `List one directory level. ${searchScopeDescription}`,
+  glob: `Find paths by glob. ${searchScopeDescription}`,
+  grep: `Search file content. ${searchScopeDescription}`,
+};
+
+type FoundOutput = z.output<typeof searchOutputSchema>;
+
+/** Long matching lines would flood the context; the cap is applied once, here. */
+function capFoundLines(output: FoundOutput): FoundOutput {
+  return {
+    ...output,
+    results: output.results.map((found) =>
+      found.text === undefined ||
+      found.text.length <= maximumFoundLineCharacters
+        ? found
+        : {
+            ...found,
+            text: `${found.text.slice(0, maximumFoundLineCharacters)}…`,
+          },
+    ),
+  };
+}
+
+/** Plain lines for the model: `path`, or `path:line: text`, then why it stopped early. */
+function renderFound(output: FoundOutput): string {
+  const lines = output.results.map((found) =>
+    found.line === undefined
+      ? `${found.path}${found.type === "directory" ? "/" : ""}`
+      : `${found.path}:${String(found.line)}: ${found.text ?? ""}`,
+  );
+  if (lines.length === 0 && output.truncated === null)
+    lines.push("(nothing found)");
+  if (output.truncated === "limit")
+    lines.push("[truncated: result limit reached; raise limit or narrow path]");
+  if (output.truncated === "scan")
+    lines.push(
+      "[truncated: scan limit reached before the search finished; narrow path]",
+    );
+  return lines.join("\n");
+}
+
+function presentSearch(
+  result: FoundOutput,
+): Pick<MuleToolResult, "content" | "isError"> {
+  return {
+    content: [{ type: "text", text: renderFound(result) }],
+    isError: false,
+  };
+}
+
+/**
+ * Guest code and MCP callers never receive base64: the image goes through the
+ * execution's image collector (the `images.view` path) and the value is a caption.
+ */
+export function presentReadForGuest(
+  result: z.output<typeof readOutputSchema>,
+  context: InvocationContext,
+): z.output<typeof readGuestOutputSchema> {
+  if (!("image" in result)) return result;
+  if (context.images === undefined)
+    throw new Error(
+      "Images can only be read inside execute or through the read tool.",
+    );
+  const { mimeType, data, bytes } = result.image;
+  const ref = context.images.push({
+    data,
+    mimeType,
+    path: result.path,
+    bytes,
+  });
+  return { path: result.path, image: { ref, mimeType, bytes } };
+}
+
+/**
+ * Images reach the model as an image part; text pages stay JSON text. The
+ * Files surface counts the images it shows and refuses past the run limit.
+ */
+function presentRead(admit: () => boolean) {
+  return (
+    result: z.output<typeof readOutputSchema>,
+  ): Pick<MuleToolResult, "content" | "isError"> => {
+    if (!("image" in result))
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        isError: false,
+      };
+    if (!admit())
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Image limit reached for this run (max ${String(MAX_EXECUTION_IMAGES)} images). Work with the images already shown.`,
+          },
+        ],
+        isError: true,
+      };
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            path: result.path,
+            mimeType: result.image.mimeType,
+            bytes: result.image.bytes,
+          }),
+        },
+        {
+          type: "image",
+          data: result.image.data,
+          mimeType: result.image.mimeType,
+        },
+      ],
+      isError: false,
+    };
+  };
+}
+
 /** Present the very same Files operation and decoder used behind execute. */
 function readOnlyTool<I extends z.ZodType, O extends z.ZodType>(
-  name: "read" | "list" | "glob" | "grep",
+  name: Exclude<FileToolName, "apply_patch">,
   description: string,
   inputSchema: I,
   outputSchema: O,
@@ -649,6 +767,12 @@ function readOnlyTool<I extends z.ZodType, O extends z.ZodType>(
     input: z.output<I>,
     context: InvocationContext,
   ) => Promise<z.output<O>>,
+  present: (
+    result: z.output<O>,
+  ) => Pick<MuleToolResult, "content" | "isError"> = (result) => ({
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    isError: false,
+  }),
 ): FileTool {
   const readOnly: MuleTool & FileTool = {
     [fileToolBrand]: true,
@@ -658,7 +782,8 @@ function readOnlyTool<I extends z.ZodType, O extends z.ZodType>(
     descriptor: {
       name,
       description,
-      parameters: z.toJSONSchema(inputSchema),
+      // Input side: defaulted fields are optional for the model.
+      parameters: toolParameters(inputSchema),
     },
     executionMode: "sequential",
     prepare: (call) =>
@@ -678,13 +803,7 @@ function readOnlyTool<I extends z.ZodType, O extends z.ZodType>(
                 Effect.map((result) => ({
                   type: "result" as const,
                   result: {
-                    content: [
-                      {
-                        type: "text" as const,
-                        text: JSON.stringify(result),
-                      },
-                    ],
-                    isError: false,
+                    ...present(result),
                   },
                 })),
               ),
@@ -709,42 +828,47 @@ export function files(input: FilesConnectionOptions): FilesSurface {
           patchOutputSchema.parse(
             await patch(patchInputSchema.parse(value), context),
           );
+  /** Images the direct `read` tool has shown in this Files surface's run. */
+  let directImages = 0;
   const operations = {
     read: Mycelium.operation({
       replay: "safe",
       access: "read",
       input: readInputSchema,
-      output: readOutputSchema,
-      description: describe("Read one bounded UTF-8 file page."),
+      output: readGuestOutputSchema,
+      description: describe(readDescription),
       execute: async (operationInput, context) =>
-        input.port.read(operationInput, context),
+        presentReadForGuest(
+          await input.port.read(operationInput, context),
+          context,
+        ),
     }),
     list: Mycelium.operation({
       replay: "safe",
       access: "read",
       input: listInputSchema,
-      output: listOutputSchema,
-      description: describe("List one bounded directory level."),
+      output: searchOutputSchema,
+      description: describe(searchDescriptions.list),
       execute: async (operationInput, context) =>
-        input.port.list(operationInput, context),
+        capFoundLines(await input.port.list(operationInput, context)),
     }),
     glob: Mycelium.operation({
       replay: "safe",
       access: "read",
       input: globInputSchema,
-      output: globOutputSchema,
-      description: describe("Find bounded paths by pattern."),
+      output: searchOutputSchema,
+      description: describe(searchDescriptions.glob),
       execute: async (operationInput, context) =>
-        input.port.glob(operationInput, context),
+        capFoundLines(await input.port.glob(operationInput, context)),
     }),
     grep: Mycelium.operation({
       replay: "safe",
       access: "read",
       input: grepInputSchema,
-      output: grepOutputSchema,
-      description: describe("Search bounded file content."),
+      output: searchOutputSchema,
+      description: describe(searchDescriptions.grep),
       execute: async (operationInput, context) =>
-        input.port.grep(operationInput, context),
+        capFoundLines(await input.port.grep(operationInput, context)),
     }),
     edit: Mycelium.operation({
       replay: "unsafe",
@@ -774,31 +898,38 @@ export function files(input: FilesConnectionOptions): FilesSurface {
       ...(invokePatch === undefined ? [] : [patchTool(invokePatch)]),
       readOnlyTool(
         "read",
-        describe("Read one bounded UTF-8 file page."),
+        describe(readDescription),
         readInputSchema,
         readOutputSchema,
         input.port.read,
+        presentRead(() => (directImages += 1) <= MAX_EXECUTION_IMAGES),
       ),
       readOnlyTool(
         "list",
-        describe("List one bounded directory level."),
+        describe(searchDescriptions.list),
         listInputSchema,
-        listOutputSchema,
-        input.port.list,
+        searchOutputSchema,
+        async (value, context) =>
+          capFoundLines(await input.port.list(value, context)),
+        presentSearch,
       ),
       readOnlyTool(
         "glob",
-        describe("Find bounded paths by pattern."),
+        describe(searchDescriptions.glob),
         globInputSchema,
-        globOutputSchema,
-        input.port.glob,
+        searchOutputSchema,
+        async (value, context) =>
+          capFoundLines(await input.port.glob(value, context)),
+        presentSearch,
       ),
       readOnlyTool(
         "grep",
-        describe("Search bounded file content."),
+        describe(searchDescriptions.grep),
         grepInputSchema,
-        grepOutputSchema,
-        input.port.grep,
+        searchOutputSchema,
+        async (value, context) =>
+          capFoundLines(await input.port.grep(value, context)),
+        presentSearch,
       ),
     ]),
     module: Mycelium.module({

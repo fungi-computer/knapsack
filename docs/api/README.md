@@ -15,3 +15,4 @@
 | [files-read](files-read.md)             | -           |
 | [index](index.md)                       | -           |
 | [patch](patch.md)                       | -           |
+| [ui-browser](ui-browser.md)             | -           |
