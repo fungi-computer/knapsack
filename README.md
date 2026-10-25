@@ -98,7 +98,11 @@ invalidates its captured modules when that list changes.
 Computer calls preserve Mycelium's invocation context, including its execution
 identity, abort signal and deadline. Advertised Computer operations are marked
 unsafe to replay because their implementation can change external state. The
-host's provider remains responsible for admission on each call.
+host's provider remains responsible for admission on each call. An interactive
+host may set `confirmCalls: true` on its Computer connection to request Mycelium
+confirmation before every advertised call. The advertisement does not
+distinguish read-only from mutating operations, so this policy confirms both;
+other connections keep their existing approval policy.
 
 `Knapsack.files({ port })` builds a Files module and direct tools from one port.
 Text edits use `port.replace` with the expected original content; the host must

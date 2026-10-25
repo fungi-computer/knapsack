@@ -343,6 +343,7 @@ type ComputerConnectionOptions = Readonly<{
   id: string;
   name: string;
   namespace?: readonly string[];
+  confirmCalls?: boolean;
   files?: FilesConnectionOptions;
   role?: string;
   computer: KnapsackComputer;
@@ -411,7 +412,7 @@ type McpServersConnectionOptions = Readonly<{
   >;
   subscribe: (invalidate) => () => void;
   onUnavailable: (error) => void;
-  fetch: FetchLike;
+  fetch: (url, init?) => Promise<Response>;
   namespace?: readonly string[];
   connectTimeoutMillis?: number;
 }>;

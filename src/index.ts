@@ -65,6 +65,9 @@ export type ComputerConnectionOptions = Readonly<{
   name: string;
   /** Logical parent namespace; the Computer name is its final segment. */
   namespace?: readonly string[];
+  /** Ask a person before each advertised call on this connection. The host
+   * chooses this for interactive MCP; Agent connections keep their own policy. */
+  confirmCalls?: boolean;
   /** Files scoped by the host to this Computer, under its own authority id. */
   files?: FilesConnectionOptions;
   /**
@@ -128,6 +131,7 @@ function projectComputer(
     operations[advertised.id] = Mycelium.operation({
       // Computer advertisements may execute arbitrary host actions.
       replay: "unsafe",
+      confirm: input.confirmCalls === true,
       description: advertised.description,
       input: operationSchema(advertised.parameters),
       output,

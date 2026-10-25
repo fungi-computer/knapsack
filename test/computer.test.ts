@@ -366,6 +366,70 @@ describe("Knapsack Computer connection", () => {
     await second.release();
   });
 
+  it("asks before host-confirmed Computer calls without changing other connections", async () => {
+    const calls: string[] = [];
+    const approvals: string[] = [];
+    for (const confirmCalls of [true, false]) {
+      const results: unknown[] = [];
+      const runtime = await Mycelium.make({
+        sources: [
+          Knapsack.computer({
+            id: "home-computer",
+            name: "computer",
+            confirmCalls,
+            computer: {
+              getCapabilities: () => Promise.resolve(advertisement),
+              call: (operation, input) => {
+                calls.push(operation);
+                return Promise.resolve(input);
+              },
+            },
+          }),
+        ],
+        access: {
+          confirm: (request) => {
+            approvals.push(request.operation);
+            return Promise.resolve(false);
+          },
+        },
+        sandbox: directSandbox(async (bindings) => {
+          const echo = bindings.computer?.echo;
+          if (echo === undefined)
+            throw new Error("Computer echo is unavailable");
+          results.push(await echo({ value: "protected" }));
+          return null;
+        }),
+      });
+      const lease = await runtime.acquire();
+      try {
+        const prepared = await Effect.runPromise(
+          lease.executeTool.prepare({
+            type: "toolCall",
+            id: "confirmation",
+            name: "execute",
+            arguments: { code: "return computer.echo({ value: 'protected' })" },
+          }),
+        );
+        await Effect.runPromise(Stream.runDrain(prepared.execute()));
+        expect(results).toEqual(
+          confirmCalls
+            ? [
+                expect.objectContaining({
+                  refused: true,
+                  reason: "declined",
+                }),
+              ]
+            : [{ value: "protected" }],
+        );
+      } finally {
+        await lease.release();
+        await runtime.close();
+      }
+    }
+    expect(approvals).toEqual(["echo"]);
+    expect(calls).toEqual(["echo"]);
+  });
+
   it("forwards the Mycelium invocation context to Computer calls", async () => {
     expectTypeOf<
       Parameters<KnapsackComputer["call"]>[0]

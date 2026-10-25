@@ -1,5 +1,18 @@
 # @fungi.computer/knapsack
 
+## 0.2.1
+
+### Patch Changes
+
+- Changes since 0.2.0:
+
+  - fix(oyster): require confirmation for MCP Workspace calls
+  - fix(oyster): keep MCP SDK declarations out of Worker graph
+
+- Updated dependencies
+  - @fungi.computer/mule@0.1.1
+  - @fungi.computer/mycelium@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

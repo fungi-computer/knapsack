@@ -49,7 +49,7 @@ export type McpServersConnectionOptions = Readonly<{
   /** Receives each server dropped from an acquisition and why. */
   onUnavailable: (error: McpServerUnavailableError) => void;
   /** Host egress for every MCP request; the host chooses where requests may go. */
-  fetch: FetchLike;
+  fetch: (url: string | URL, init?: RequestInit) => Promise<Response>;
   /** Parent namespace for every server module; defaults to `["mcp"]`. */
   namespace?: readonly string[];
   /** Bound on connecting and listing one server; defaults to 10 seconds. */
