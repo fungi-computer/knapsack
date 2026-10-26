@@ -163,7 +163,7 @@ async function editFailure(
     .parse(JSON.parse(result.content[0].text));
 }
 
-describe("Knapsack patch-deferred Files module", () => {
+describe("Knapsack Files module", () => {
   it("executes the real read binding through the Mycelium execute door", async () => {
     const result = await executeInner(memoryPort("hello").port, "read", {
       path: "hello.txt",

@@ -1,5 +1,21 @@
 # @fungi.computer/knapsack
 
+## 0.3.0
+
+### Minor Changes
+
+- Changes since 0.2.1:
+
+  - fix(local): refuse read-only Files edits without approval
+  - feat(local): stage read-only Files writes for human approval
+  - fix(oyster): require confirmation for MCP Workspace calls
+
+### Patch Changes
+
+- Updated dependencies
+  - @fungi.computer/mule@0.2.0
+  - @fungi.computer/mycelium@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

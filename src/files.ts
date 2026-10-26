@@ -47,7 +47,8 @@ export type FilesEditErrorReason =
   | "partial-character"
   | "unchanged"
   | "not-text"
-  | "conflict";
+  | "conflict"
+  | "read-only";
 
 /** Expected Files edit refusal, kept distinct from unexpected host failures. */
 export class FilesEditError extends Error {
@@ -146,6 +147,7 @@ export const filesEditFailureSchema = z.lazy(() =>
         "not-text",
         "unchanged",
         "conflict",
+        "read-only",
       ]),
       path: pathSchema,
       message: z.string(),
@@ -166,6 +168,8 @@ export type FilesPatch = (
 
 /** Captured host file authority; the host owns path confinement and atomic replacement. */
 export type FilesPort = Readonly<{
+  /** Host-selected mode gate, before an edit reads or computes a replacement. */
+  assertEditable?: (path: string) => void;
   /** Omitted when this Files host has no qualified native patch engine. */
   patch?: FilesPatch;
   /** Read a bounded text page. */
@@ -437,6 +441,7 @@ async function applyEdit(
   input: z.output<typeof editInputSchema>,
   context: InvocationContext,
 ): Promise<z.output<typeof editSuccessSchema>> {
+  port.assertEditable?.(input.path);
   const current = readOutputSchema.parse(
     await port.read(
       {
@@ -548,9 +553,16 @@ export async function edit(
 /** Cancellation does not finish until the Files owner has acknowledged cleanup. */
 function runFileOperation<T>(
   invoke: (context: InvocationContext) => Promise<T>,
+  toolCallId?: string,
 ) {
   return Effect.callback<T, MuleError>((resume, signal) => {
-    const pending = invoke({ executionId: nanoid(), deadlineAt: null, signal });
+    const context: InvocationContext = {
+      executionId: toolCallId ?? nanoid(),
+      deadlineAt: null,
+      signal,
+    };
+    if (toolCallId !== undefined) Object.assign(context, { toolCallId });
+    const pending = invoke(context);
     void pending.then(
       (result) => {
         resume(Effect.succeed(result));
@@ -575,8 +587,12 @@ function runFileOperation<T>(
   });
 }
 
-function runPatch(invoke: FilesPatch, input: Parameters<FilesPatch>[0]) {
-  return runFileOperation((context) => invoke(input, context));
+function runPatch(
+  invoke: FilesPatch,
+  input: Parameters<FilesPatch>[0],
+  toolCallId: string,
+) {
+  return runFileOperation((context) => invoke(input, context), toolCallId);
 }
 
 /** Keep model parameters while omitting the decoder's schema-document marker. */
@@ -616,7 +632,7 @@ function patchTool(invokePatch: FilesPatch): FileTool {
         Effect.map((value) => ({
           execute: () =>
             Stream.fromEffect(
-              runPatch(invokePatch, value).pipe(
+              runPatch(invokePatch, value, call.id).pipe(
                 Effect.map((result) => ({
                   type: "result" as const,
                   result: {
@@ -626,7 +642,8 @@ function patchTool(invokePatch: FilesPatch): FileTool {
                         text: JSON.stringify(result),
                       },
                     ],
-                    isError: result.status !== "completed",
+                    isError:
+                      "status" in result && result.status !== "completed",
                   },
                 })),
               ),
