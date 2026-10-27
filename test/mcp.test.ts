@@ -17,7 +17,7 @@ import {
   type McpServerConnection,
 } from "../src/index.js";
 
-const token = "fixture-bearer-0123456789abcdef";
+const token = "fixture-bearer-0123456789abcdef"; //gitleaks:allow
 
 /** A real SDK MCP server: one read tool, one write tool, one awkward name. */
 function fixtureServer() {
