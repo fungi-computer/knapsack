@@ -26,8 +26,9 @@ const WhistleAvailabilitySchema = z.discriminatedUnion("status", [
 ]);
 
 /** The same descriptor is decoded at browser ingress and in model tool results. */
+const commandKey = z.strictObject({ namespace: identifier, id: identifier });
 const browserCommandRowFields = {
-  commandId: identifier,
+  command: commandKey,
   sourceId: identifier,
   title: z.string(),
   category: z.string(),
@@ -54,8 +55,12 @@ export const BrowserCommandRowSchema = z.union([
   browserCommandRowWithoutActionSchema,
 ]);
 
+// Whistle answers an empty or unknown key itself, as `invalid` or `missing`.
 const browserExecuteCommandSchema = z.object({
-  commandId: z.string().max(256),
+  command: z.strictObject({
+    namespace: z.string().max(256),
+    id: z.string().max(256),
+  }),
 });
 const browserExecuteInputWireSchema = browserExecuteCommandSchema
   .extend({ arguments: json })

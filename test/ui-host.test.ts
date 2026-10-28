@@ -169,7 +169,7 @@ describe("Knapsack.ui connected browser capability", () => {
         },
       };
       let expected: BrowserCommandRow = {
-        commandId: "form:submit",
+        command: { namespace: "form", id: "submit" },
         sourceId: "mounted-app",
         title: "Submit form",
         category: "forms",
@@ -206,7 +206,10 @@ describe("Knapsack.ui connected browser capability", () => {
                 host,
                 connection,
                 whistle,
-                { type: "execute", commandId: "form:submit" },
+                {
+                  type: "execute",
+                  command: { namespace: "form", id: "submit" },
+                },
               );
               return { discovery, execution };
             }),
@@ -282,38 +285,41 @@ describe("Knapsack.ui connected browser capability", () => {
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "demo:show" },
+            { type: "execute", command: { namespace: "demo", id: "show" } },
           );
           const missing = yield* requestThroughBrowser(
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "demo:missing" },
+            { type: "execute", command: { namespace: "demo", id: "missing" } },
           );
           const failed = yield* requestThroughBrowser(
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "demo:fail" },
+            { type: "execute", command: { namespace: "demo", id: "fail" } },
           );
           const invalidResult = yield* requestThroughBrowser(
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "demo:invalid-result" },
+            {
+              type: "execute",
+              command: { namespace: "demo", id: "invalid-result" },
+            },
           );
           const invalid = yield* requestThroughBrowser(
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "" },
+            { type: "execute", command: { namespace: "", id: "" } },
           );
           whistle.close();
           const closed = yield* requestThroughBrowser(
             host,
             connection,
             whistle,
-            { type: "execute", commandId: "demo:show" },
+            { type: "execute", command: { namespace: "demo", id: "show" } },
           );
           return {
             discovery,
@@ -332,7 +338,7 @@ describe("Knapsack.ui connected browser capability", () => {
       type: "discover",
       commands: [
         {
-          commandId: "demo:show",
+          command: { namespace: "demo", id: "show" },
           sourceId: "demo-browser",
           title: "Show browser state",
           category: "navigation",
@@ -416,7 +422,10 @@ describe("Knapsack.ui connected browser capability", () => {
           .connect()
           .pipe(Scope.provide(connectionScope));
         const pending = yield* Effect.forkChild(
-          host.request({ type: "execute", commandId: "demo:show" }),
+          host.request({
+            type: "execute",
+            command: { namespace: "demo", id: "show" },
+          }),
         );
         const envelope = yield* connection.take;
         const claimId = expectClaimed(
@@ -453,7 +462,10 @@ describe("Knapsack.ui connected browser capability", () => {
           .connect()
           .pipe(Scope.provide(connectionScope));
         const pending = yield* Effect.forkChild(
-          host.request({ type: "execute", commandId: "demo:show" }),
+          host.request({
+            type: "execute",
+            command: { namespace: "demo", id: "show" },
+          }),
         );
         const envelope = yield* connection.take;
         yield* Fiber.interrupt(pending);
@@ -510,7 +522,10 @@ describe("Knapsack.ui connected browser capability", () => {
           const host = yield* make();
           const connection = yield* host.connect();
           const requester = yield* Effect.forkChild(
-            host.request({ type: "execute", commandId: "demo:hold" }),
+            host.request({
+              type: "execute",
+              command: { namespace: "demo", id: "hold" },
+            }),
           );
           const envelope = yield* connection.take;
           const claimId = expectClaimed(
@@ -821,7 +836,7 @@ describe("Knapsack.ui connected browser capability", () => {
           }
           const execute = ui.execute;
           if (execute === undefined) throw new Error("Missing ui.execute");
-          return await execute({ commandId: "demo:show" });
+          return await execute({ command: { namespace: "demo", id: "show" } });
         },
       },
     });
@@ -832,7 +847,7 @@ describe("Knapsack.ui connected browser capability", () => {
         status: "available",
         commands: [
           {
-            commandId: "demo:show",
+            command: { namespace: "demo", id: "show" },
             sourceId: "mycelium-browser",
             title: "Show",
             category: "demo",
@@ -879,7 +894,7 @@ describe("Knapsack.ui connected browser capability", () => {
       "x-result-label": "Receipt",
     };
     const row = {
-      commandId: "wire:dispatch",
+      command: { namespace: "wire", id: "dispatch" },
       sourceId: "wire-browser",
       title: "Dispatch",
       category: "agent",
@@ -1025,7 +1040,7 @@ describe("Knapsack.ui connected browser capability", () => {
           const execute = ui.execute;
           if (execute === undefined) throw new Error("Missing execution");
           return await execute({
-            commandId: "wire:dispatch",
+            command: { namespace: "wire", id: "dispatch" },
             arguments: { target: request.code === "fail" ? "bad" : "alpha" },
           });
         },
@@ -1041,7 +1056,7 @@ describe("Knapsack.ui connected browser capability", () => {
         status: "available",
         commands: [
           {
-            commandId: "wire:dispatch",
+            command: { namespace: "wire", id: "dispatch" },
             sourceId: "wire-browser",
             title: "Dispatch",
             category: "agent",
@@ -1052,7 +1067,7 @@ describe("Knapsack.ui connected browser capability", () => {
             action: { inputSchema, outputSchema },
           },
           {
-            commandId: "wire:presentation-only",
+            command: { namespace: "wire", id: "presentation-only" },
             sourceId: "wire-browser",
             title: "Presentation only",
             category: "agent",
@@ -1083,7 +1098,7 @@ describe("Knapsack.ui connected browser capability", () => {
         status: "available",
         commands: [
           {
-            commandId: "wire:dispatch",
+            command: { namespace: "wire", id: "dispatch" },
             sourceId: "wire-browser",
             title: "Dispatch",
             category: "agent",
@@ -1097,7 +1112,7 @@ describe("Knapsack.ui connected browser capability", () => {
             action: { inputSchema, outputSchema },
           },
           {
-            commandId: "wire:presentation-only",
+            command: { namespace: "wire", id: "presentation-only" },
             sourceId: "wire-browser",
             title: "Presentation only",
             category: "agent",
@@ -1143,7 +1158,7 @@ describe("Knapsack.ui connected browser capability", () => {
           }
           const execute = ui.execute;
           if (execute === undefined) throw new Error("Missing ui.execute");
-          return await execute({ commandId: "demo:show" });
+          return await execute({ command: { namespace: "demo", id: "show" } });
         },
       },
     });

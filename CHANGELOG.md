@@ -1,5 +1,22 @@
 # @fungi.computer/knapsack
 
+## 0.4.0
+
+### Minor Changes
+
+- Changes since 0.3.1:
+
+  - refactor(whistle)!: execute commands by their typed key; only Whistle mints
+    ids
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @fungi.computer/mule@0.2.1
+  - @fungi.computer/whistle@0.3.0
+  - @fungi.computer/mycelium@0.2.3
+
 ## 0.3.1
 
 ### Patch Changes

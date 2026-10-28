@@ -1,6 +1,6 @@
 {
   "name": "@fungi.computer/knapsack",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "author": "Levi <levi@technomancy.dev>",
   "description": "Agent tool connections projected into Mycelium capability sources",
   "type": "module",

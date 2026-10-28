@@ -89,7 +89,7 @@ function projectCommands(
         const sourceAction = row.action;
         // Focus scope belongs to the local command graph, not the browser wire.
         const projected = {
-          commandId: row.commandId,
+          command: { namespace: row.command.namespace, id: row.command.id },
           sourceId: row.sourceId,
           title: row.title,
           category: row.category,
@@ -151,13 +151,13 @@ export function handleBrowserRequest(
         result: { type: "discover", commands },
       })),
     );
-  const commandId = envelope.request.commandId;
+  const command = envelope.request.command;
   const argumentsValue =
     "arguments" in envelope.request ? envelope.request.arguments : undefined;
   return Effect.tryPromise({
     try: () =>
       options.whistle.execute(
-        commandId,
+        command,
         argumentsValue === undefined
           ? { origin: "agent" }
           : { origin: "agent", arguments: argumentsValue },
