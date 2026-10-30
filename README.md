@@ -66,10 +66,10 @@ npm install @fungi.computer/knapsack
 ```
 
 The package is an ESM public candidate, not a claim of npm publication. It
-depends on Cairn, Forage, Mule, Mycelium, the MCP SDK client, Effect, Zod and
-`diff` and `ignore`. Its explicit file list contains compiled JavaScript and
-declarations, the API reference, this README and the license texts. It has no
-install scripts.
+depends on Cairn, Forage, Mule, Mycelium, Whistle, the MCP SDK client, Effect,
+Zod and `diff` and `ignore`. Its explicit file list contains compiled JavaScript
+and declarations, the API reference, this README and the license texts. It has
+no install scripts.
 
 ## Quick start: validate a read request
 
@@ -118,7 +118,7 @@ later requests answer 410 and later runs fail to borrow.
 
 ## API reference
 
-The [generated reference](docs/api/README.md) covers every public entry:
+The [generated reference](docs/api/README.md) covers these entries:
 
 | Entry               | Use                                                                                         |
 | ------------------- | ------------------------------------------------------------------------------------------- |
@@ -128,6 +128,9 @@ The [generated reference](docs/api/README.md) covers every public entry:
 | `/patch`            | Read Codex patch operations for presentation; the native engine validates and applies them. |
 | `/files-read-codec` | Encode read requests and adapt a framed host transport to the Files read port.              |
 | `/ui/browser`       | Connect an App's Whistle runtime to one Agent Session's `Knapsack.ui` transport.            |
+
+The public `/files-search` entry provides the search-visibility policy described
+above; it does not have a generated reference page.
 
 ## Examples and checks
 
