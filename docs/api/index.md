@@ -206,7 +206,8 @@ type FilesEditErrorReason =
   | "partial-character"
   | "unchanged"
   | "not-text"
-  | "conflict";
+  | "conflict"
+  | "read-only";
 ```
 
 Typed refusal from a bounded or conditional Files edit.
@@ -243,6 +244,7 @@ signal.
 
 ```ts
 type FilesPort = Readonly<{
+  assertEditable?: (path) => void;
   patch?: FilesPatch;
   read: (input, context) => Promise<z.output<typeof readOutputSchema>>;
   list: (input, context) => Promise<z.output<typeof searchOutputSchema>>;
@@ -596,6 +598,7 @@ const filesEditFailureSchema: ZodLazy<ZodObject<{
         unchanged: "unchanged";
         not-text: "not-text";
         conflict: "conflict";
+        read-only: "read-only";
      }>;
      path: ZodLazy<ZodString>;
      message: ZodString;
@@ -631,6 +634,7 @@ const editOutputSchema: ZodUnion<readonly [ZodLazy<ZodObject<{
         unchanged: "unchanged";
         not-text: "not-text";
         conflict: "conflict";
+        read-only: "read-only";
      }>;
      path: ZodLazy<ZodString>;
      message: ZodString;
@@ -687,7 +691,8 @@ function edit(
           | "partial-character"
           | "unchanged"
           | "not-text"
-          | "conflict";
+          | "conflict"
+          | "read-only";
         path: string;
         message: string;
       };
@@ -717,7 +722,8 @@ captured FilesPort.
 `unifiedPatchRemovedLines`: `number`; `unifiedPatchTruncated`: `boolean`; \} \|
 \{ `status`: `"failed"`; `error`: \{ `kind`: \| `"not-found"` \| `"ambiguous"`
 \| `"file-too-large"` \| `"partial-character"` \| `"unchanged"` \| `"not-text"`
-\| `"conflict"`; `path`: `string`; `message`: `string`; \}; \}\>
+\| `"conflict"` \| `"read-only"`; `path`: `string`; `message`: `string`; \};
+\}\>
 
 ---
 
