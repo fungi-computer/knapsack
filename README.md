@@ -1,8 +1,39 @@
-# @fungi.computer/knapsack
+# Knapsack (`@fungi.computer/knapsack`)
 
-Knapsack collects Agent tool connections. A connection discovers one external
-capability provider and projects its advertised operations into a Mycelium
-`CapabilitySource`.
+Knapsack gives an Agent tools from the things it is connected to: Computers,
+file systems, remote MCP servers and the App open in its browser. Each
+connection discovers what one provider offers and projects it into a
+[Mycelium](https://github.com/fungi-computer/mycelium) capability source, so the
+Agent calls it through one `execute` tool.
+
+## Set up
+
+```sh
+npm install @fungi.computer/knapsack
+```
+
+The package is ESM. It depends on Cairn, Forage, Mule, Mycelium, Whistle, the
+MCP SDK client, Effect, Zod and `diff` and `ignore`. Its explicit file list
+contains compiled JavaScript and declarations, the API reference, this README
+and the license texts. It has no install scripts.
+
+## Quick start: validate a read request
+
+This example uses the same public decoder as the packed-consumer proof in
+[test/stranger/runtime.mjs](test/stranger/runtime.mjs). It validates a request;
+it does not grant file access or perform I/O.
+
+```ts
+import { readInputSchema } from "@fungi.computer/knapsack";
+
+export const request = readInputSchema.parse({
+  path: "notes.md",
+  offset: 0,
+  limit: 4,
+});
+```
+
+## Connections
 
 The first connection is `Knapsack.computer`. A Computer provider continues to
 own its operation implementations, schemas, storage, and execution. Knapsack
@@ -58,34 +89,6 @@ root-relative search paths (the root and every entry), excludes `.git` path
 components and respects excluded ancestors. Adapters supply bounded ignore-file
 text; maintained `ignore` owns gitignore grammar and nested negation. Exact-path
 reads do not use search visibility.
-
-## Set up
-
-```sh
-npm install @fungi.computer/knapsack
-```
-
-The package is an ESM public candidate, not a claim of npm publication. It
-depends on Cairn, Forage, Mule, Mycelium, Whistle, the MCP SDK client, Effect,
-Zod and `diff` and `ignore`. Its explicit file list contains compiled JavaScript
-and declarations, the API reference, this README and the license texts. It has
-no install scripts.
-
-## Quick start: validate a read request
-
-This example uses the same public decoder as the packed-consumer proof in
-[test/stranger/runtime.mjs](test/stranger/runtime.mjs). It validates a request;
-it does not grant file access or perform I/O.
-
-```ts
-import { readInputSchema } from "@fungi.computer/knapsack";
-
-export const request = readInputSchema.parse({
-  path: "notes.md",
-  offset: 0,
-  limit: 4,
-});
-```
 
 ## Core concepts
 
