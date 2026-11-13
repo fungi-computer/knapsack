@@ -1,5 +1,12 @@
 # @fungi.computer/knapsack
 
+## 0.4.10
+
+### Patch Changes
+
+- @fungi.computer/forage@0.3.6
+  - @fungi.computer/mycelium@0.3.9
+
 ## 0.4.9
 
 ### Patch Changes
