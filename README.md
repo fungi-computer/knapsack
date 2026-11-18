@@ -1,5 +1,59 @@
 # Knapsack (`@fungi.computer/knapsack`)
 
+Knapsack gives an AI agent tools from whatever it is connected to: a Computer, a
+file system, a remote MCP tool server, or the App open in its browser.
+
+```mermaid
+flowchart LR
+  Conn[Computers, files, MCP servers, browser App] --> Knapsack
+  Knapsack -->|capability source| Mycelium
+  Mycelium -->|one execute tool| Agent
+```
+
+## Quick start
+
+Install it:
+
+```sh
+npm install @fungi.computer/knapsack
+```
+
+This example uses the same public decoder as the packed-consumer proof in
+[test/stranger/runtime.mjs](test/stranger/runtime.mjs). It validates a request;
+it does not grant file access or perform I/O.
+
+```ts
+import { readInputSchema } from "@fungi.computer/knapsack";
+
+export const request = readInputSchema.parse({
+  path: "notes.md",
+  offset: 0,
+  limit: 4,
+});
+```
+
+## Common tasks
+
+### Validate a read request
+
+`readInputSchema` decodes a file read. See the Quick start.
+
+### Connect a provider
+
+See [Connections](#connections).
+
+### Understand what an Agent can call
+
+See [Core concepts](#core-concepts).
+
+### Know the limits
+
+See Limits and errors.
+
+## Reference
+
+### Overview
+
 Knapsack gives an Agent tools from the things it is connected to: Computers,
 file systems, remote MCP servers and the App open in its browser. Each
 connection discovers what one provider offers and projects it into a
@@ -16,22 +70,6 @@ The package is ESM. It depends on Cairn, Forage, Mule, Mycelium, Whistle, the
 MCP SDK client, Effect, Zod and `diff` and `ignore`. Its explicit file list
 contains compiled JavaScript and declarations, the API reference, this README
 and the license texts. It has no install scripts.
-
-## Quick start: validate a read request
-
-This example uses the same public decoder as the packed-consumer proof in
-[test/stranger/runtime.mjs](test/stranger/runtime.mjs). It validates a request;
-it does not grant file access or perform I/O.
-
-```ts
-import { readInputSchema } from "@fungi.computer/knapsack";
-
-export const request = readInputSchema.parse({
-  path: "notes.md",
-  offset: 0,
-  limit: 4,
-});
-```
 
 ## Connections
 
