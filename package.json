@@ -1,6 +1,6 @@
 {
   "name": "@fungi.computer/knapsack",
-  "version": "0.4.20",
+  "version": "0.4.21",
   "author": "Levi <levi@technomancy.dev>",
   "description": "Agent tool connections projected into Mycelium capability sources",
   "type": "module",
@@ -63,6 +63,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.2",
     "@modelcontextprotocol/server": "2.0.0",
     "@types/node": "24.13.3",
     "eventsource": "5.1.1",

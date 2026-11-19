@@ -221,7 +221,8 @@ async function connect(
   const client = new mcp.Client({ name: "fungi-knapsack", version: "1" });
   const transport = new mcp.StreamableHTTPClientTransport(new URL(server.url), {
     // Credentials go to this endpoint only; a redirect could carry them away.
-    requestInit: { headers: { ...server.headers }, redirect: "error" },
+    // Workers refuse `redirect: "error"`; a manual 3xx is not `ok`, so the SDK never follows it.
+    requestInit: { headers: { ...server.headers }, redirect: "manual" },
     fetch,
   });
   try {

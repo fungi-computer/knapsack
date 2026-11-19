@@ -1,5 +1,16 @@
 # @fungi.computer/knapsack
 
+## 0.4.21
+
+### Patch Changes
+
+- Changes since 0.4.20:
+
+  - fix(veil): give the workerd Connection packages a test:unit tier
+  - fix(veil): run the workerd Connection proofs in the merge gate
+  - fix(knapsack): connect MCP servers with a manual redirect so Workers accept
+    them
+
 ## 0.4.20
 
 ### Patch Changes
