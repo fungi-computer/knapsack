@@ -1,5 +1,13 @@
 # @fungi.computer/knapsack
 
+## 0.4.22
+
+### Patch Changes
+
+- Changes since 0.4.21:
+
+  - perf(knapsack): build the grapheme segmenter on first file read
+
 ## 0.4.21
 
 ### Patch Changes

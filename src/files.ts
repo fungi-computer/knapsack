@@ -248,7 +248,13 @@ type FuzzyView = Readonly<{
   ends: readonly number[];
 }>;
 
-const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+// Built on the first file read: constructing a Segmenter loads ICU data, which
+// Worker startup must not pay for a tool no request has called yet.
+let graphemeSegmenter: Intl.Segmenter | undefined;
+const graphemes = () =>
+  (graphemeSegmenter ??= new Intl.Segmenter(undefined, {
+    granularity: "grapheme",
+  }));
 const lineTerminator = /\r\n|\r|\n/gu;
 
 function stripBom(content: string): { bom: string; text: string } {
@@ -287,7 +293,7 @@ function fuzzyView(content: string): FuzzyView {
   const ends: number[] = [];
   const appendLine = (lineStart: number, lineEnd: number) => {
     const lineOffset = text.length;
-    for (const { segment, index } of graphemes.segment(
+    for (const { segment, index } of graphemes().segment(
       content.slice(lineStart, lineEnd),
     )) {
       const folded = foldGrapheme(segment);
