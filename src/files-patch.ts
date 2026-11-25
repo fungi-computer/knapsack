@@ -28,7 +28,14 @@ export const patchOutputSchema = z.lazy(() =>
   z.union([
     patchResultSchema,
     patchResultSchema.extend({
-      error: z.strictObject({ kind: z.literal("mismatch") }),
+      error: z.union([
+        z.strictObject({ kind: z.literal("mismatch") }),
+        z.strictObject({
+          kind: z.literal("engine_missing"),
+          /** A plain platform reason; the patch text was never judged. */
+          reason: z.string(),
+        }),
+      ]),
     }),
   ]),
 );

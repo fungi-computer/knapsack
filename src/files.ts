@@ -912,7 +912,7 @@ export function files(input: FilesConnectionOptions): FilesSurface {
           input: patchInputSchema,
           output: patchOutputSchema,
           description: describe(
-            "Apply a bounded Codex-format patch through the same Files owner as apply_patch.",
+            'Create, update, move and delete files with a bounded Codex-format patch, through the same Files owner as apply_patch. Create a file with "*** Begin Patch\\n*** Add File: path\\n+line\\n*** End Patch\\n"; use "*** Update File: path" with optional "*** Move to: new/path" and @@/+/-/space lines, or "*** Delete File: path".',
           ),
           execute: invokePatch,
         });

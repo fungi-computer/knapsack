@@ -1,5 +1,14 @@
 # @fungi.computer/knapsack
 
+## 0.4.33
+
+### Patch Changes
+
+- Changes since 0.4.32:
+
+  - fix(files): treat a non-executable patch engine as a platform failure
+  - fix(files): say patch creates files and report a missing patch engine
+
 ## 0.4.32
 
 ### Patch Changes

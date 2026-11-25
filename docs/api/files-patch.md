@@ -58,9 +58,12 @@ const patchOutputSchema: ZodLazy<ZodUnion<readonly [ZodObject<{
      keptBytes: ZodNumber;
      totalBytes: ZodNumber;
   }, $strict>>]>;
-  error: ZodObject<{
+  error: ZodUnion<readonly [ZodObject<{
      kind: ZodLiteral<"mismatch">;
-  }, $strict>;
+   }, $strict>, ZodObject<{
+     kind: ZodLiteral<"engine_missing">;
+     reason: ZodString;
+  }, $strict>]>;
 }, $strict>]>>;
 ```
 
