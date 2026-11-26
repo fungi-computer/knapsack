@@ -1,6 +1,6 @@
 {
   "name": "@fungi.computer/knapsack",
-  "version": "0.4.36",
+  "version": "0.4.37",
   "author": "Levi <levi@technomancy.dev>",
   "description": "Agent tool connections projected into Mycelium capability sources",
   "type": "module",
@@ -52,9 +52,9 @@
   },
   "dependencies": {
     "@fungi.computer/cairn": "0.1.1",
-    "@fungi.computer/forage": "0.6.0",
+    "@fungi.computer/forage": "0.6.1",
     "@fungi.computer/mule": "0.4.1",
-    "@fungi.computer/mycelium": "0.5.5",
+    "@fungi.computer/mycelium": "0.5.6",
     "@fungi.computer/whistle": "0.3.0",
     "@modelcontextprotocol/client": "2.0.0",
     "diff": "8.0.4",
