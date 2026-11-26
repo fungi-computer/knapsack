@@ -1,5 +1,13 @@
 # @fungi.computer/knapsack
 
+## 0.4.36
+
+### Patch Changes
+
+- Updated dependencies
+  - @fungi.computer/forage@0.6.0
+  - @fungi.computer/mycelium@0.5.5
+
 ## 0.4.35
 
 ### Patch Changes
